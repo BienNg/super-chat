@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Classes</title>
+    <!-- Base styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Icons - Updated Lucide implementation -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        .calendar-day {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        .calendar-day.selected {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .calendar-day.highlighted {
+            background-color: #dbeafe;
+        }
+        /* Add new table styles */
+        .student-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .student-table th {
+            position: sticky;
+            top: 0;
+            background-color: white;
+            z-index: 10;
+            padding: 12px 16px;
+            white-space: nowrap;
+        }
+        .student-table td {
+            padding: 12px 16px;
+            vertical-align: middle;
+        }
+        .student-table tr:hover {
+            background-color: #f8fafc;
+        }
+        .truncate {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .email-cell {
+            max-width: 180px;
+        }
+        .transaction-cell {
+            max-width: 220px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Chat Interface</h1>
+    
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="chat-messages.html" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="chat-classes.html" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="users"></i>
+                </a>
+                <a href="chat-tasks.html" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Channel Sidebar -->
+        <div class="w-64 bg-indigo-800 text-white flex flex-col">
+            <div class="p-4 border-b border-indigo-700">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold">Channels</h2>
+                    <button class="text-indigo-300 hover:text-white">
+                        <i data-lucide="plus" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-3">
+                <div class="bg-indigo-700 rounded-md flex items-center p-2">
+                    <i data-lucide="search" class="h-4 w-4 text-indigo-300 mr-2"></i>
+                    <input type="text" placeholder="Search channels" class="bg-transparent border-none text-sm text-white placeholder-indigo-300 focus:outline-none w-full" />
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto">
+                <div class="px-3 py-2">
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center py-1 px-2 rounded bg-indigo-600 text-white">
+                            <span class="text-sm"># A1.1 Morning Class</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># B2.2 Evening Class</span>
+                            <span class="ml-auto bg-indigo-500 text-xs rounded-full px-1.5">3</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># Teacher's Lounge</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># Admin Team</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="px-3 py-2 mt-4">
+                    <div class="flex items-center justify-between text-xs text-indigo-300 mb-2">
+                        <span class="font-semibold">DIRECT MESSAGES</span>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Sarah Johnson</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Alex Chen</span>
+                            <span class="ml-auto bg-indigo-500 text-xs rounded-full px-1.5">1</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="flex-1 flex flex-col bg-white">
+            <!-- Chat Header -->
+            <div class="h-14 border-b border-gray-200 px-4 flex items-center justify-between">
+                <div class="flex items-center">
+                    <h3 class="font-semibold text-gray-800">#G38</h3>
+                    <span class="ml-2 text-sm text-gray-500">14 students</span>
+                </div>
+                
+                <!-- Tab Navigation -->
+                <div class="flex items-center space-x-1">
+                    <a href="chat-messages.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Messages</a>
+                    <button class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">Classes</button>
+                    <a href="chat-tasks.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Tasks</a>
+                    <a href="chat-wiki.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Wiki</a>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="more-horizontal" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Classes Sub-tabs -->
+            <div class="border-b border-gray-200 px-4">
+                <div class="flex items-center space-x-1">
+                    <button id="courses-tab" onclick="showTab('courses')" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">Courses</button>
+                    <button id="info-tab" onclick="showTab('info')" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Info</button>
+                </div>
+            </div>
+            
+            <!-- Courses Screen -->
+            <div id="courses-screen" class="flex-1 overflow-y-auto">
+                <!-- Course Level Section -->
+                <div class="p-6">
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex">
+                            <!-- Left side - Calendar -->
+                            <div class="w-62 p-2 border-r border-gray-200">
+                                <div class="bg-white rounded-lg p-4">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div>
+                                            <h3 class="text-lg font-semibold">G38 B1.2</h3>
+                                            <div class="flex items-center gap-2 text-sm text-gray-600">
+                                                <span>Online</span>
+                                                <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                                <span>17_B1.2_Online_VN</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between mb-6">
+                                        <div class="flex items-center gap-4">
+                                            <div>
+                                                <div class="text-sm text-gray-600">Start</div>
+                                                <div class="font-semibold">03.05</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm text-gray-600">End</div>
+                                                <div class="font-semibold">20.05</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-sm text-gray-600">Sessions</div>
+                                                <div class="font-semibold">6/6</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Calendar -->
+                                    <div class="bg-white rounded-lg">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <button class="p-1 hover:bg-gray-100 rounded">
+                                                <i data-lucide="chevron-left" class="h-5 w-5 text-gray-600"></i>
+                                            </button>
+                                            <div class="font-medium">May 2025</div>
+                                            <button class="p-1 hover:bg-gray-100 rounded">
+                                                <i data-lucide="chevron-right" class="h-5 w-5 text-gray-600"></i>
+                                            </button>
+                                        </div>
+                                        <div class="grid grid-cols-7 gap-1 text-center text-xs mb-2">
+                                            <div class="text-gray-500">Sun</div>
+                                            <div class="text-gray-500">Mon</div>
+                                            <div class="text-gray-500">Tue</div>
+                                            <div class="text-gray-500">Wed</div>
+                                            <div class="text-gray-500">Thu</div>
+                                            <div class="text-gray-500">Fri</div>
+                                            <div class="text-gray-500">Sat</div>
+                                        </div>
+                                        <div class="grid grid-cols-7 gap-1 text-sm">
+                                            <div class="calendar-day text-gray-400">28</div>
+                                            <div class="calendar-day text-gray-400">29</div>
+                                            <div class="calendar-day text-gray-400">30</div>
+                                            <div class="calendar-day">1</div>
+                                            <div class="calendar-day">2</div>
+                                            <div class="calendar-day selected">3</div>
+                                            <div class="calendar-day">4</div>
+                                            <div class="calendar-day">5</div>
+                                            <div class="calendar-day highlighted">6</div>
+                                            <div class="calendar-day">7</div>
+                                            <div class="calendar-day highlighted">8</div>
+                                            <div class="calendar-day">9</div>
+                                            <div class="calendar-day highlighted">10</div>
+                                            <div class="calendar-day">11</div>
+                                            <div class="calendar-day">12</div>
+                                            <div class="calendar-day highlighted">13</div>
+                                            <div class="calendar-day">14</div>
+                                            <div class="calendar-day highlighted">15</div>
+                                            <div class="calendar-day">16</div>
+                                            <div class="calendar-day highlighted">17</div>
+                                            <div class="calendar-day">18</div>
+                                            <div class="calendar-day">19</div>
+                                            <div class="calendar-day highlighted">20</div>
+                                            <div class="calendar-day">21</div>
+                                            <div class="calendar-day">22</div>
+                                            <div class="calendar-day">23</div>
+                                            <div class="calendar-day">24</div>
+                                            <div class="calendar-day">25</div>
+                                            <div class="calendar-day">26</div>
+                                            <div class="calendar-day">27</div>
+                                            <div class="calendar-day">28</div>
+                                            <div class="calendar-day">29</div>
+                                            <div class="calendar-day">30</div>
+                                            <div class="calendar-day">31</div>
+                                            <div class="calendar-day text-gray-400">1</div>
+                                            <div class="calendar-day text-gray-400">2</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right side - Student Table -->
+                            <div class="flex-1 p-6">
+                                <div class="mb-4">
+                                    <h3 class="text-lg font-semibold mb-2">Student List</h3>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full student-table">
+                                        <thead>
+                                            <tr class="border-b border-gray-200">
+                                                <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">Name</th>
+                                                <th class="text-right py-3 px-4 text-sm font-medium text-gray-600">Amount (VND)</th>
+                                                <th class="text-left py-3 px-4 text-sm font-medium text-gray-600">Date</th>
+                                                <th class="w-6"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-gray-500 flex-shrink-0 flex items-center justify-center text-white font-medium">AK</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Anh Kiệt - G60</div>
+                                                            <div class="text-sm text-gray-500">kietbui1612@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/05</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-indigo-500 flex-shrink-0 flex items-center justify-center text-white font-medium">MT</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Minh Thư - G38</div>
+                                                            <div class="text-sm text-gray-500">thunguyen98@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/04</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-purple-500 flex-shrink-0 flex items-center justify-center text-white font-medium">HL</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Hoàng Long - G38</div>
+                                                            <div class="text-sm text-gray-500">longhoang2000@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/04</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-green-500 flex-shrink-0 flex items-center justify-center text-white font-medium">TH</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Thanh Hà - G38</div>
+                                                            <div class="text-sm text-gray-500">hale123@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/03</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center text-white font-medium">DA</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Đức Anh - G38</div>
+                                                            <div class="text-sm text-gray-500">anhdo555@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/03</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-pink-500 flex-shrink-0 flex items-center justify-center text-white font-medium">ML</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Mai Linh - G38</div>
+                                                            <div class="text-sm text-gray-500">linhmai2002@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/02</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-yellow-500 flex-shrink-0 flex items-center justify-center text-white font-medium">QM</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Quang Minh - G38</div>
+                                                            <div class="text-sm text-gray-500">minhquang99@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/02</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-red-500 flex-shrink-0 flex items-center justify-center text-white font-medium">TT</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Thu Trang - G38</div>
+                                                            <div class="text-sm text-gray-500">trangnt24@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/01</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-orange-500 flex-shrink-0 flex items-center justify-center text-white font-medium">VN</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Văn Nam - G38</div>
+                                                            <div class="text-sm text-gray-500">namvan2001@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/01</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-3 px-4">
+                                                    <div class="flex items-center">
+                                                        <div class="w-8 h-8 rounded-full bg-teal-500 flex-shrink-0 flex items-center justify-center text-white font-medium">BN</div>
+                                                        <div class="ml-3">
+                                                            <div class="text-sm font-medium text-gray-900">Bảo Ngọc - G38</div>
+                                                            <div class="text-sm text-gray-500">ngocpham97@gmail.com</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="py-3 px-4 text-right">5,900,000</td>
+                                                <td class="py-3 px-4 text-gray-500 whitespace-nowrap">2025/03/01</td>
+                                                <td class="w-6">
+                                                    <button class="p-0.5 hover:bg-gray-100 rounded-full">
+                                                        <i data-lucide="chevron-right" class="h-3 w-3 text-gray-500"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Screen (Initially Hidden) -->
+            <div id="info-screen" class="flex-1 flex flex-col hidden">
+                <!-- Class Info -->
+                <div class="grid grid-cols-3 gap-6 p-6">
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-medium text-gray-500">Class Details</h3>
+                            <button class="text-indigo-600 text-sm font-medium">Edit</button>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="text-xs text-gray-500">Level</div>
+                                <div class="text-sm font-medium text-gray-900">A1.1 Beginner</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500">Schedule</div>
+                                <div class="text-sm font-medium text-gray-900">Mon, Wed, Fri • 9:00 - 10:30</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500">Duration</div>
+                                <div class="text-sm font-medium text-gray-900">Feb 1 - Apr 30, 2024</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-medium text-gray-500">Teachers</h3>
+                            <button class="text-indigo-600 text-sm font-medium">Manage</button>
+                        </div>
+                        <div class="flex -space-x-2">
+                            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium ring-2 ring-white">SJ</div>
+                            <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium ring-2 ring-white">MT</div>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-sm text-gray-900">Sarah Johnson (Lead)</div>
+                            <div class="text-sm text-gray-900">Mai Tran (Assistant)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl p-6 shadow-sm">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-medium text-gray-500">Students</h3>
+                            <button class="text-indigo-600 text-sm font-medium">Add Student</button>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="text-2xl font-bold text-gray-900">12/15</div>
+                            <div class="text-sm text-gray-500">students enrolled</div>
+                        </div>
+                        <div class="mt-2 flex -space-x-2">
+                            <div class="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white text-sm font-medium ring-2 ring-white">JD</div>
+                            <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium ring-2 ring-white">AC</div>
+                            <div class="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white text-sm font-medium ring-2 ring-white">LN</div>
+                            <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium ring-2 ring-white">+9</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student List -->
+                <div class="p-6 pt-0">
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="relative">
+                                    <input type="text" placeholder="Search students..." class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <i data-lucide="search" class="h-5 w-5 text-gray-400 absolute left-3 top-2.5"></i>
+                                </div>
+                                <select class="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option>All Students</option>
+                                    <option>Active</option>
+                                    <option>Inactive</option>
+                                </select>
+                            </div>
+                            <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center">
+                                <i data-lucide="download" class="h-4 w-4 mr-1"></i>
+                                Export List
+                            </button>
+                        </div>
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attendance</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <!-- ... existing student rows ... -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons({
+            attrs: {
+                class: ["lucide"],
+                strokeWidth: "2",
+            }
+        });
+
+        // Tab switching functionality
+        function showTab(tabName) {
+            // Hide all screens
+            document.getElementById('courses-screen').classList.add('hidden');
+            document.getElementById('info-screen').classList.add('hidden');
+            
+            // Show selected screen
+            document.getElementById(tabName + '-screen').classList.remove('hidden');
+            
+            // Update tab styles
+            document.getElementById('courses-tab').classList.remove('text-indigo-600', 'border-indigo-600');
+            document.getElementById('info-tab').classList.remove('text-indigo-600', 'border-indigo-600');
+            document.getElementById('courses-tab').classList.add('text-gray-500');
+            document.getElementById('info-tab').classList.add('text-gray-500');
+            
+            document.getElementById(tabName + '-tab').classList.remove('text-gray-500');
+            document.getElementById(tabName + '-tab').classList.add('text-indigo-600', 'border-indigo-600');
+        }
+    </script>
+</body>
+</html> 

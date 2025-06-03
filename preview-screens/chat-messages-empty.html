@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Empty Messages</title>
+    <!-- Base styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Icons - Updated Lucide implementation -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- TinyMCE -->
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+    <!-- Emoji Picker -->
+    <script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@latest/dist/index.min.js"></script>
+    <!-- Mentions -->
+    <script src="https://cdn.jsdelivr.net/npm/tributejs@5.1.3/dist/tribute.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tributejs@5.1.3/dist/tribute.css">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        /* Message input styles */
+        .message-input {
+            border: 1px solid #E5E7EB;
+            border-radius: 0.5rem;
+            background-color: white;
+        }
+        .message-input:focus-within {
+            border-color: #6366F1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+        }
+        .toolbar-button {
+            padding: 0.375rem;
+            border-radius: 0.375rem;
+            color: #6B7280;
+            transition: all 0.2s;
+        }
+        .toolbar-button:hover {
+            background-color: #F3F4F6;
+            color: #374151;
+        }
+        .toolbar-button.active {
+            background-color: #EEF2FF;
+            color: #6366F1;
+        }
+        [contenteditable=true]:empty:before {
+            content: attr(placeholder);
+            color: #9CA3AF;
+            pointer-events: none;
+        }
+        .message-container {
+            position: relative;
+            padding: 8px;
+            margin: -8px;
+            border-radius: 8px;
+            transition: background-color 0.15s ease;
+        }
+        .message-container:hover {
+            background-color: #F8FAFC;
+        }
+        .message-hover-options {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: none;
+            background-color: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+            padding: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .message-container:hover .message-hover-options {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .hover-button {
+            padding: 4px;
+            border-radius: 4px;
+            color: #6B7280;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .hover-button:hover {
+            background-color: #F3F4F6;
+            color: #374151;
+        }
+        .tab-inactive {
+            /* Removing visual indicators but keeping as spans for non-interactivity */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Chat Interface - Inactive Tabs View</h1>
+    
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="users"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Channel Sidebar -->
+        <div class="w-64 bg-indigo-800 text-white flex flex-col">
+            <div class="p-4 border-b border-indigo-700">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold">Channels</h2>
+                    <button class="text-indigo-300 hover:text-white">
+                        <i data-lucide="plus" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-3">
+                <div class="bg-indigo-700 rounded-md flex items-center p-2">
+                    <i data-lucide="search" class="h-4 w-4 text-indigo-300 mr-2"></i>
+                    <input type="text" placeholder="Search channels" class="bg-transparent border-none text-sm text-white placeholder-indigo-300 focus:outline-none w-full" />
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto">
+                <div class="px-3 py-2">
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center py-1 px-2 rounded bg-indigo-600 text-white">
+                            <span class="text-sm"># A1.1 Morning Class</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># B2.2 Evening Class</span>
+                            <span class="ml-auto bg-indigo-500 text-xs rounded-full px-1.5">3</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># Teacher's Lounge</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># Admin Team</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="px-3 py-2 mt-4">
+                    <div class="flex items-center justify-between text-xs text-indigo-300 mb-2">
+                        <span class="font-semibold">DIRECT MESSAGES</span>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Sarah Johnson</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Alex Chen</span>
+                            <span class="ml-auto bg-indigo-500 text-xs rounded-full px-1.5">1</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="flex-1 flex flex-col bg-white">
+            <!-- Chat Header -->
+            <div class="h-14 border-b border-gray-200 px-4 flex items-center justify-between">
+                <div class="flex items-center">
+                    <h3 class="font-semibold text-gray-800">#G38</h3>
+                    <span class="ml-2 text-sm text-gray-500">5 members</span>
+                </div>
+                
+                <!-- Tab Navigation - All tabs inactive but looking normal -->
+                <div class="flex items-center space-x-1">
+                    <span class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">Messages</span>
+                    <a href="chat-classes-empty.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Classes</a>
+                    <a href="chat-tasks-empty.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Tasks</a>
+                    <span class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Wiki</span>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="more-horizontal" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Messages Screen -->
+            <div id="messages-screen" class="flex-1 flex flex-col">
+                <!-- Message Actions Bar -->
+                <div class="px-4 py-2 border-b border-gray-200 flex items-center space-x-2">
+                    <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-md transition">
+                        <i data-lucide="bookmark" class="h-4 w-4"></i>
+                    </button>
+                    <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-md transition">
+                        <i data-lucide="pin" class="h-4 w-4"></i>
+                    </button>
+                    <button class="p-1.5 text-gray-600 hover:bg-gray-100 rounded-md transition">
+                        <i data-lucide="plus" class="h-4 w-4"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center justify-center text-center">
+                    <!-- Empty State -->
+                    <div class="max-w-sm">
+                        <div class="mb-6 p-4 bg-gray-50 rounded-full inline-block">
+                            <i data-lucide="message-square" class="h-8 w-8 text-gray-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">No messages yet</h3>
+                        <p class="text-gray-500">Start the conversation by sending your first message to the class.</p>
+                    </div>
+                </div>
+                
+                <!-- Message Input -->
+                <div class="p-4">
+                    <div class="message-input">
+                        <!-- Formatting Toolbar -->
+                        <div class="flex items-center px-3 py-2 border-b border-gray-200">
+                            <button class="toolbar-button" title="Bold">
+                                <i data-lucide="bold" class="h-4 w-4"></i>
+                            </button>
+                            <button class="toolbar-button" title="Italic">
+                                <i data-lucide="italic" class="h-4 w-4"></i>
+                            </button>
+                            <button class="toolbar-button" title="Strikethrough">
+                                <i data-lucide="strikethrough" class="h-4 w-4"></i>
+                            </button>
+                            <div class="w-px h-4 bg-gray-200 mx-2"></div>
+                            <button class="toolbar-button" title="Link">
+                                <i data-lucide="link" class="h-4 w-4"></i>
+                            </button>
+                            <button class="toolbar-button" title="Bullet List">
+                                <i data-lucide="list" class="h-4 w-4"></i>
+                            </button>
+                            <button class="toolbar-button" title="Numbered List">
+                                <i data-lucide="list-ordered" class="h-4 w-4"></i>
+                            </button>
+                            <button class="toolbar-button" title="Indent">
+                                <i data-lucide="indent" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Message Input Area -->
+                        <div class="px-3 py-2 min-h-[60px]">
+                            <div id="message-editor" 
+                                 contenteditable="true" 
+                                 class="w-full focus:outline-none" 
+                                 placeholder="Message #import-s-hai-duong-minh-thu-"></div>
+                        </div>
+                        
+                        <!-- Bottom Toolbar -->
+                        <div class="flex items-center px-3 py-2 border-t border-gray-200">
+                            <div class="flex items-center space-x-2">
+                                <button class="toolbar-button" id="emoji-button" title="Emoji">
+                                    <i data-lucide="smile" class="h-4 w-4"></i>
+                                </button>
+                                <button class="toolbar-button" title="Mention">
+                                    <i data-lucide="at-sign" class="h-4 w-4"></i>
+                                </button>
+                                <button class="toolbar-button" title="Attach File">
+                                    <i data-lucide="paperclip" class="h-4 w-4"></i>
+                                </button>
+                                <button class="toolbar-button" title="Record">
+                                    <i data-lucide="mic" class="h-4 w-4"></i>
+                                </button>
+                                <button class="toolbar-button" title="Screenshot">
+                                    <i data-lucide="camera" class="h-4 w-4"></i>
+                                </button>
+                            </div>
+                            <button class="ml-auto text-gray-400">
+                                <i data-lucide="corner-down-left" class="h-5 w-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons({
+            attrs: {
+                class: ["lucide"],
+                strokeWidth: "2",
+            }
+        });
+
+        // Initialize emoji picker
+        const emojiButton = document.getElementById('emoji-button');
+        const picker = new EmojiButton({
+            position: 'top-start',
+            rootElement: document.getElementById('messages-screen'),
+            theme: 'light'
+        });
+        
+        picker.on('emoji', emoji => {
+            const editor = document.getElementById('message-editor');
+            editor.innerHTML += emoji;
+        });
+        
+        emojiButton.addEventListener('click', () => {
+            picker.togglePicker(emojiButton);
+        });
+        
+        // Initialize mentions
+        const tribute = new Tribute({
+            values: [
+                { key: 'Sarah Johnson', value: 'Sarah Johnson' },
+                { key: 'Alex Chen', value: 'Alex Chen' },
+                { key: 'John Doe', value: 'John Doe' }
+            ],
+            trigger: '@'
+        });
+        
+        tribute.attach(document.getElementById('message-editor'));
+    </script>
+</body>
+</html> 

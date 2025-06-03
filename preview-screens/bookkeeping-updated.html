@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Bookkeeping Updated</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/lucide-icons@latest/dist/umd/lucide.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide-icons"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        .dropdown-menu {
+            display: none;
+        }
+        .dropdown-menu.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Bookkeeping Interface - Updated Actions</h1>
+    
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="users"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <div class="h-16 border-b border-gray-200 px-6 flex items-center justify-between bg-white">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-800">Financial Overview</h1>
+                    <button class="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center">
+                        <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                        Record Payment
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <select class="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>EUR</option>
+                        <option>VND</option>
+                    </select>
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="download" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-4 gap-6 p-6">
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Total Revenue</h3>
+                        <span class="text-green-500">
+                            <i data-lucide="trending-up" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">€24,500</span>
+                        <span class="ml-2 text-sm text-green-500">+12.5%</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">vs. previous month</div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Monthly Revenue</h3>
+                        <span class="text-green-500">
+                            <i data-lucide="trending-up" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">€8,250</span>
+                        <span class="ml-2 text-sm text-green-500">+5.3%</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">vs. previous month</div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Pending Payments</h3>
+                        <span class="text-yellow-500">
+                            <i data-lucide="clock" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">€3,800</span>
+                        <span class="ml-2 text-sm text-yellow-500">12 pending</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Due this month</div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Exchange Rate</h3>
+                        <span class="text-blue-500">
+                            <i data-lucide="refresh-cw" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">1 EUR = 26,000 VND</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Updated 5 mins ago</div>
+                </div>
+            </div>
+            
+            <!-- Recent Transactions -->
+            <div class="px-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">Recent Transactions</h2>
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center text-white font-medium text-sm">JD</div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900">John Doe</div>
+                                            <div class="text-sm text-gray-500">john@example.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">A1.1 Morning Class</div>
+                                    <div class="text-sm text-gray-500">Full Payment</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">€750</div>
+                                    <div class="text-sm text-gray-500">19,500,000 VND</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-02-15</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                                    <div class="truncate" title="Bank transfer completed">Bank transfer completed</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="relative">
+                                        <button class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-all duration-150" onclick="toggleDropdown('dropdown-1')">
+                                            <i data-lucide="more-vertical" class="h-4 w-4"></i>
+                                        </button>
+                                        
+                                        <!-- Dropdown Menu -->
+                                        <div id="dropdown-1" class="dropdown-menu absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                                            <div class="py-1">
+                                                <button class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                                    <i data-lucide="eye" class="h-4 w-4 mr-3"></i>
+                                                    View Details
+                                                </button>
+                                                <button class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                                    <i data-lucide="edit" class="h-4 w-4 mr-3"></i>
+                                                    Edit Payment
+                                                </button>
+                                                <div class="border-t border-gray-100"></div>
+                                                <button class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center">
+                                                    <i data-lucide="trash-2" class="h-4 w-4 mr-3"></i>
+                                                    Delete Payment
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-green-500 flex-shrink-0 flex items-center justify-center text-white font-medium text-sm">MT</div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900">Mai Tran</div>
+                                            <div class="text-sm text-gray-500">mai@example.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">B2.2 Evening Class</div>
+                                    <div class="text-sm text-gray-500">Partial Payment</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">€400</div>
+                                    <div class="text-sm text-gray-500">10,400,000 VND</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-02-14</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                                    <div class="truncate" title="Waiting for confirmation">Waiting for confirmation</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="relative">
+                                        <button class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-all duration-150" onclick="toggleDropdown('dropdown-2')">
+                                            <i data-lucide="more-vertical" class="h-4 w-4"></i>
+                                        </button>
+                                        
+                                        <!-- Dropdown Menu (Shown as open) -->
+                                        <div id="dropdown-2" class="dropdown-menu active absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                                            <div class="py-1">
+                                                <button class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                                    <i data-lucide="eye" class="h-4 w-4 mr-3"></i>
+                                                    View Details
+                                                </button>
+                                                <button class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                                    <i data-lucide="edit" class="h-4 w-4 mr-3"></i>
+                                                    Edit Payment
+                                                </button>
+                                                <div class="border-t border-gray-100"></div>
+                                                <button class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center">
+                                                    <i data-lucide="trash-2" class="h-4 w-4 mr-3"></i>
+                                                    Delete Payment
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-purple-500 flex-shrink-0 flex items-center justify-center text-white font-medium text-sm">AS</div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900">Anna Schmidt</div>
+                                            <div class="text-sm text-gray-500">anna@example.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">C1.1 Intensive Course</div>
+                                    <div class="text-sm text-gray-500">Deposit</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">€250</div>
+                                    <div class="text-sm text-gray-500">6,500,000 VND</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-02-13</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                                    <div class="truncate">-</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="relative">
+                                        <button class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-all duration-150" onclick="toggleDropdown('dropdown-3')">
+                                            <i data-lucide="more-vertical" class="h-4 w-4"></i>
+                                        </button>
+                                        
+                                        <!-- Dropdown Menu -->
+                                        <div id="dropdown-3" class="dropdown-menu absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                                            <div class="py-1">
+                                                <button class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                                    <i data-lucide="eye" class="h-4 w-4 mr-3"></i>
+                                                    View Details
+                                                </button>
+                                                <button class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                                                    <i data-lucide="edit" class="h-4 w-4 mr-3"></i>
+                                                    Edit Payment
+                                                </button>
+                                                <div class="border-t border-gray-100"></div>
+                                                <button class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center">
+                                                    <i data-lucide="trash-2" class="h-4 w-4 mr-3"></i>
+                                                    Delete Payment
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize lucide icons
+        lucide.createIcons();
+        
+        // Dropdown functionality
+        function toggleDropdown(dropdownId) {
+            // Close all other dropdowns
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu.id !== dropdownId) {
+                    menu.classList.remove('active');
+                }
+            });
+            
+            // Toggle the clicked dropdown
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.classList.toggle('active');
+        }
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.relative')) {
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.classList.remove('active');
+                });
+            }
+        });
+    </script>
+</body>
+</html> 

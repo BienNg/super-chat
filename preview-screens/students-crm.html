@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Students CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .funnel-step {
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+        .step-lead { background: #EEF2FF; color: #6366F1; }
+        .step-contacted { background: #FEF3C7; color: #D97706; }
+        .step-interested { background: #DBEAFE; color: #2563EB; }
+        .step-enrolled { background: #D1FAE5; color: #059669; }
+        .step-paid { background: #DCFCE7; color: #16A34A; }
+        .step-inactive { background: #F3F4F6; color: #6B7280; }
+        
+        .platform-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .platform-facebook { background: #EBF8FF; color: #1D4ED8; }
+        .platform-zalo { background: #FEF3C7; color: #D97706; }
+        .platform-whatsapp { background: #D1FAE5; color: #059669; }
+        .platform-instagram { background: #FCE7F3; color: #BE185D; }
+        
+        .course-tag {
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 500;
+            background: #F3F4F6;
+            color: #374151;
+        }
+
+        /* Modern Modal Styles */
+        .modern-modal {
+            backdrop-filter: blur(20px);
+            background: rgba(0, 0, 0, 0.6);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: modalSlideIn 0.4s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            pointer-events: none;
+        }
+        
+        .modal-inner {
+            background: white;
+            margin: 2px;
+            border-radius: 22px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        .step-indicator {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .step-indicator.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .step-indicator.completed {
+            background: #10B981;
+            color: white;
+        }
+        
+        .step-indicator.inactive {
+            background: #F3F4F6;
+            color: #9CA3AF;
+        }
+        
+        .form-step {
+            display: none;
+            animation: stepFadeIn 0.3s ease-out;
+        }
+        
+        .form-step.active {
+            display: block;
+        }
+        
+        .modern-input {
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #FAFAFA;
+        }
+        
+        .modern-input:focus {
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            outline: none;
+            transform: translateY(-1px);
+        }
+        
+        .modern-select {
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #FAFAFA;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 12px center;
+            background-repeat: no-repeat;
+            background-size: 16px;
+        }
+        
+        .modern-select:focus {
+            border-color: #667eea;
+            background-color: white;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            outline: none;
+            transform: translateY(-1px);
+        }
+        
+        .modern-checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #E5E7EB;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .modern-checkbox:checked {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+        }
+        
+        .modern-checkbox:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .floating-label {
+            position: relative;
+        }
+        
+        .floating-label label {
+            position: absolute;
+            left: 16px;
+            top: 16px;
+            color: #9CA3AF;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            pointer-events: none;
+            background: transparent;
+            padding: 0 4px;
+        }
+        
+        .floating-label input:focus + label,
+        .floating-label input:not(:placeholder-shown) + label,
+        .floating-label select:focus + label,
+        .floating-label select:not([value=""]) + label {
+            top: -8px;
+            left: 12px;
+            font-size: 12px;
+            color: #667eea;
+            background: white;
+            font-weight: 500;
+        }
+        
+        .gradient-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            padding: 16px 32px;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .gradient-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .gradient-button:hover::before {
+            left: 100%;
+        }
+        
+        .gradient-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes modalSlideIn {
+            from { 
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        @keyframes stepFadeIn {
+            from { 
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .course-card {
+            border: 2px solid #E5E7EB;
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #FAFAFA;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .course-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.5s;
+        }
+        
+        .course-card:hover::before {
+            left: 100%;
+        }
+        
+        .course-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+        }
+        
+        .course-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+        
+        .course-card-compact {
+            border: 2px solid #E5E7EB;
+            border-radius: 12px;
+            padding: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #FAFAFA;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .course-card-compact::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.5s;
+        }
+        
+        .course-card-compact:hover::before {
+            left: 100%;
+        }
+        
+        .course-card-compact:hover {
+            border-color: #667eea;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+        }
+        
+        .course-card-compact.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+        
+        .success-animation {
+            animation: successPulse 0.6s ease-out;
+        }
+        
+        @keyframes successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Students CRM Interface</h1>
+    
+    <!-- Main Screen -->
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="graduation-cap"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <div class="h-16 border-b border-gray-200 px-6 flex items-center justify-between bg-white">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-800">Students</h1>
+                    <button class="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center" onclick="openAddStudentModal()">
+                        <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                        Add Student
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <input type="text" placeholder="Search students..." class="pl-10 pr-4 py-2 border border-gray-200 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <i data-lucide="search" class="h-5 w-5 text-gray-400 absolute left-3 top-2.5"></i>
+                    </div>
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="filter" class="h-5 w-5"></i>
+                    </button>
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="download" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Filters -->
+            <div class="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-medium text-gray-600">Funnel Step:</span>
+                    <select class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>All Steps</option>
+                        <option>Lead</option>
+                        <option>Contacted</option>
+                        <option>Interested</option>
+                        <option>Enrolled</option>
+                        <option>Paid</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-medium text-gray-600">Course Interest:</span>
+                    <select class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>All Courses</option>
+                        <option>A1.1</option>
+                        <option>A1.2</option>
+                        <option>A2.1</option>
+                        <option>B1.1</option>
+                        <option>Visa Service</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-medium text-gray-600">Platform:</span>
+                    <select class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>All Platforms</option>
+                        <option>Facebook</option>
+                        <option>Zalo</option>
+                        <option>WhatsApp</option>
+                        <option>Instagram</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-medium text-gray-600">Location:</span>
+                    <select class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>All Countries</option>
+                        <option>Vietnam</option>
+                        <option>Germany</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Students Table -->
+            <div class="flex-1 overflow-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funnel Step</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interest</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center text-white font-medium">NT</div>
+                                    <div class="ml-3">
+                                        <div class="text-sm font-medium text-gray-900">Nguyen Thi Mai</div>
+                                        <div class="text-sm text-gray-500">ID: STU001</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">mai.nguyen@email.com</div>
+                                <div class="text-sm text-gray-500">+84 901 234 567</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">Vietnam</div>
+                                <div class="text-sm text-gray-500">Ho Chi Minh City</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="funnel-step step-enrolled">Enrolled</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="course-tag">A1.1 Online</span>
+                                    <span class="text-xs text-gray-500">Visa Service</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="platform-badge platform-facebook">Facebook</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <button class="text-green-600 hover:text-green-900 p-1" title="Add Payment">
+                                        <i data-lucide="credit-card" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 rounded-full bg-green-500 flex-shrink-0 flex items-center justify-center text-white font-medium">LV</div>
+                                    <div class="ml-3">
+                                        <div class="text-sm font-medium text-gray-900">Le Van Duc</div>
+                                        <div class="text-sm text-gray-500">ID: STU002</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">duc.le@email.com</div>
+                                <div class="text-sm text-gray-500">+84 912 345 678</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">Vietnam</div>
+                                <div class="text-sm text-gray-500">Hanoi</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="funnel-step step-interested">Interested</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="course-tag">A2.1 Offline</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="platform-badge platform-zalo">Zalo</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <button class="text-green-600 hover:text-green-900 p-1" title="Add Payment">
+                                        <i data-lucide="credit-card" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 rounded-full bg-purple-500 flex-shrink-0 flex items-center justify-center text-white font-medium">PH</div>
+                                    <div class="ml-3">
+                                        <div class="text-sm font-medium text-gray-900">Pham Hoang An</div>
+                                        <div class="text-sm text-gray-500">ID: STU003</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">an.pham@email.com</div>
+                                <div class="text-sm text-gray-500">+84 923 456 789</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">Vietnam</div>
+                                <div class="text-sm text-gray-500">Da Nang</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="funnel-step step-paid">Paid</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="course-tag">B1.1 Online</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="platform-badge platform-whatsapp">WhatsApp</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <button class="text-green-600 hover:text-green-900 p-1" title="Add Payment">
+                                        <i data-lucide="credit-card" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 rounded-full bg-pink-500 flex-shrink-0 flex items-center justify-center text-white font-medium">TL</div>
+                                    <div class="ml-3">
+                                        <div class="text-sm font-medium text-gray-900">Tran Linh Chi</div>
+                                        <div class="text-sm text-gray-500">ID: STU004</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">chi.tran@email.com</div>
+                                <div class="text-sm text-gray-500">+84 934 567 890</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">Germany</div>
+                                <div class="text-sm text-gray-500">Berlin</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="funnel-step step-contacted">Contacted</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="course-tag">Visa Service</span>
+                                    <span class="text-xs text-gray-500">A1.1 Online</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="platform-badge platform-instagram">Instagram</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <button class="text-green-600 hover:text-green-900 p-1" title="Add Payment">
+                                        <i data-lucide="credit-card" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="w-10 h-10 rounded-full bg-yellow-500 flex-shrink-0 flex items-center justify-center text-white font-medium">VT</div>
+                                    <div class="ml-3">
+                                        <div class="text-sm font-medium text-gray-900">Vo Thanh Minh</div>
+                                        <div class="text-sm text-gray-500">ID: STU005</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">minh.vo@email.com</div>
+                                <div class="text-sm text-gray-500">+84 945 678 901</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">Vietnam</div>
+                                <div class="text-sm text-gray-500">Ho Chi Minh City</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="funnel-step step-lead">Lead</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="course-tag">A1.2 Offline</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="platform-badge platform-facebook">Facebook</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex items-center justify-end space-x-2">
+                                    <button class="text-green-600 hover:text-green-900 p-1" title="Add Payment">
+                                        <i data-lucide="credit-card" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="bg-white px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                <div class="flex-1 flex justify-between sm:hidden">
+                    <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Previous</button>
+                    <button class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Next</button>
+                </div>
+                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm text-gray-700">
+                            Showing <span class="font-medium">1</span> to <span class="font-medium">5</span> of <span class="font-medium">127</span> students
+                        </p>
+                    </div>
+                    <div>
+                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <i data-lucide="chevron-left" class="h-5 w-5"></i>
+                            </button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-indigo-50 text-sm font-medium text-indigo-600">1</button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">2</button>
+                            <button class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">3</button>
+                            <button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                <i data-lucide="chevron-right" class="h-5 w-5"></i>
+                            </button>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Detail Modal (Hidden by default) -->
+    <div class="screen-container bg-white flex mt-10" style="display: none;">
+        <!-- Same sidebar as above -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="graduation-cap"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+
+        <!-- Student Detail Content -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <div class="h-16 border-b border-gray-200 px-6 flex items-center justify-between bg-white">
+                <div class="flex items-center">
+                    <button class="mr-4 text-gray-500 hover:text-gray-700">
+                        <i data-lucide="arrow-left" class="h-5 w-5"></i>
+                    </button>
+                    <h1 class="text-xl font-semibold text-gray-800">Student Details</h1>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center">
+                        <i data-lucide="credit-card" class="h-4 w-4 mr-1"></i>
+                        Add Payment
+                    </button>
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center">
+                        <i data-lucide="edit" class="h-4 w-4 mr-1"></i>
+                        Edit
+                    </button>
+                </div>
+            </div>
+
+            <!-- Student Detail Content -->
+            <div class="flex-1 overflow-auto p-6">
+                <div class="max-w-4xl mx-auto">
+                    <!-- Student Header -->
+                    <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center">
+                                <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl font-medium">NT</div>
+                                <div class="ml-4">
+                                    <h2 class="text-2xl font-bold text-gray-900">Nguyen Thi Mai</h2>
+                                    <p class="text-gray-500">Student ID: STU001</p>
+                                    <div class="mt-2">
+                                        <span class="funnel-step step-enrolled">Enrolled</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-500">Last Contact</p>
+                                <p class="font-medium">2 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white rounded-lg border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Email</label>
+                                    <p class="text-gray-900">mai.nguyen@email.com</p>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Phone Number</label>
+                                    <p class="text-gray-900">+84 901 234 567</p>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Location</label>
+                                    <p class="text-gray-900">Vietnam, Ho Chi Minh City</p>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Platform</label>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="platform-badge platform-facebook">Facebook</span>
+                                        <a href="#" class="text-blue-600 hover:text-blue-800">
+                                            <i data-lucide="external-link" class="h-4 w-4"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Course Information</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Interested In</label>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        <span class="course-tag">A1.1 Online</span>
+                                        <span class="course-tag">Visa Service</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Selected Course</label>
+                                    <select class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option>A1.1 Online Course</option>
+                                        <option>A1.2 Online Course</option>
+                                        <option>A2.1 Online Course</option>
+                                        <option>B1.1 Online Course</option>
+                                        <option>Visa Service Package</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-500">Funnel Step</label>
+                                    <select class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option>Lead</option>
+                                        <option>Contacted</option>
+                                        <option>Interested</option>
+                                        <option selected>Enrolled</option>
+                                        <option>Paid</option>
+                                        <option>Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes Section -->
+                    <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
+                        <textarea class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" rows="4" placeholder="Add notes about this student...">Student is very motivated and asks good questions. Prefers evening classes due to work schedule. Interested in continuing to A1.2 after completing A1.1.</textarea>
+                    </div>
+
+                    <!-- Payment History -->
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Payment History</h3>
+                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center">
+                                <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                                Add Payment
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="text-left py-2 text-sm font-medium text-gray-500">Date</th>
+                                        <th class="text-left py-2 text-sm font-medium text-gray-500">Course</th>
+                                        <th class="text-left py-2 text-sm font-medium text-gray-500">Amount</th>
+                                        <th class="text-left py-2 text-sm font-medium text-gray-500">Status</th>
+                                        <th class="text-right py-2 text-sm font-medium text-gray-500">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="py-3 text-sm text-gray-900">2024-01-15</td>
+                                        <td class="py-3 text-sm text-gray-900">A1.1 Online Course</td>
+                                        <td class="py-3 text-sm text-gray-900">2,500,000 VND</td>
+                                        <td class="py-3">
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Paid</span>
+                                        </td>
+                                        <td class="py-3 text-right">
+                                            <button class="text-indigo-600 hover:text-indigo-900 text-sm">View Receipt</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-3 text-sm text-gray-900">2024-01-20</td>
+                                        <td class="py-3 text-sm text-gray-900">Visa Service</td>
+                                        <td class="py-3 text-sm text-gray-900">5,000,000 VND</td>
+                                        <td class="py-3">
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                        </td>
+                                        <td class="py-3 text-right">
+                                            <button class="text-indigo-600 hover:text-indigo-900 text-sm">Mark Paid</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Person Modal -->
+    <div id="addStudentModal" class="fixed inset-0 modern-modal flex items-center justify-center z-50" style="display: none;">
+        <div class="modal-content max-w-5xl w-full mx-4 max-h-[95vh]">
+            <div class="modal-inner overflow-hidden">
+                <!-- Header -->
+                <div class="p-6 pb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 mb-1">Welcome New Learner</h2>
+                            <p class="text-gray-600">Complete your profile in one simple form</p>
+                        </div>
+                        <button onclick="closeAddStudentModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                            <i data-lucide="x" class="h-6 w-6"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-gray-200 rounded-full h-1">
+                        <div class="progress-bar h-1 rounded-full" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- Condensed Form Content -->
+                <form class="px-6 pb-6" id="modernForm">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Left Column: Personal & Contact -->
+                        <div class="space-y-6">
+                            <!-- Personal Information -->
+                            <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-5">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-indigo-600 rounded-full flex items-center justify-center mr-3">
+                                        <i data-lucide="user" class="h-5 w-5 text-white"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Personal Details</h3>
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <div class="floating-label">
+                                        <input type="text" id="fullName" class="modern-input w-full" placeholder=" " required>
+                                        <label for="fullName">Full Name</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Contact Information -->
+                            <div class="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-5">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-600 rounded-full flex items-center justify-center mr-3">
+                                        <i data-lucide="mail" class="h-5 w-5 text-white"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Contact Details</h3>
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <div class="floating-label">
+                                        <input type="email" id="email" class="modern-input w-full" placeholder=" " required>
+                                        <label for="email">Email Address</label>
+                                    </div>
+                                    <div class="floating-label">
+                                        <input type="tel" id="phone" class="modern-input w-full" placeholder=" " required>
+                                        <label for="phone">Phone Number</label>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="floating-label">
+                                            <select id="country" class="modern-select w-full" required>
+                                                <option value="">Select Country</option>
+                                                <option value="vietnam">🇻🇳 Vietnam</option>
+                                                <option value="germany">🇩🇪 Germany</option>
+                                                <option value="other">🌍 Other</option>
+                                            </select>
+                                            <label for="country">Country</label>
+                                        </div>
+                                        <div class="floating-label">
+                                            <input type="text" id="city" class="modern-input w-full" placeholder=" ">
+                                            <label for="city">City</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Middle Column: Learning Preferences -->
+                        <div class="space-y-6">
+                            <!-- Status & Platform -->
+                            <div class="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-5">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-full flex items-center justify-center mr-3">
+                                        <i data-lucide="settings" class="h-5 w-5 text-white"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Status & Platform</h3>
+                                </div>
+                                
+                                <div class="space-y-4">
+                                    <div class="floating-label">
+                                        <select id="funnelStep" class="modern-select w-full" required>
+                                            <option value="">Select Status</option>
+                                            <option value="lead">🌱 New Lead</option>
+                                            <option value="contacted">📞 Contacted</option>
+                                            <option value="interested">💡 Interested</option>
+                                            <option value="enrolled">📚 Enrolled</option>
+                                            <option value="paid">💳 Paid</option>
+                                        </select>
+                                        <label for="funnelStep">Current Status</label>
+                                    </div>
+                                    <div class="floating-label">
+                                        <select id="platform" class="modern-select w-full" required>
+                                            <option value="">How did you find us?</option>
+                                            <option value="facebook">📘 Facebook</option>
+                                            <option value="zalo">💬 Zalo</option>
+                                            <option value="whatsapp">📱 WhatsApp</option>
+                                            <option value="instagram">📸 Instagram</option>
+                                            <option value="other">🌐 Other</option>
+                                        </select>
+                                        <label for="platform">Discovery Platform</label>
+                                    </div>
+                                    <div class="floating-label">
+                                        <input type="url" id="profileLink" class="modern-input w-full" placeholder=" ">
+                                        <label for="profileLink">Social Profile (Optional)</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Notes -->
+                            <div class="bg-gradient-to-br from-pink-50 to-red-50 rounded-2xl p-5">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-pink-400 to-red-600 rounded-full flex items-center justify-center mr-3">
+                                        <i data-lucide="file-text" class="h-5 w-5 text-white"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Additional Notes</h3>
+                                </div>
+                                
+                                <div class="floating-label">
+                                    <textarea id="notes" rows="4" class="modern-input w-full resize-none" placeholder=" "></textarea>
+                                    <label for="notes">Notes (Optional)</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Course Selection -->
+                        <div class="space-y-6">
+                            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-5">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-full flex items-center justify-center mr-3">
+                                        <i data-lucide="book-open" class="h-5 w-5 text-white"></i>
+                                    </div>
+                                    <h3 class="text-lg font-semibold text-gray-900">Courses of Interest</h3>
+                                </div>
+                                
+                                <div class="space-y-3">
+                                    <div class="course-card-compact" onclick="toggleCourse(this, 'a1-1-online')">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-medium text-gray-900">A1.1 Online</span>
+                                                <p class="text-xs text-gray-600">Beginner, flexible</p>
+                                            </div>
+                                            <div class="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="course-card-compact" onclick="toggleCourse(this, 'a1-1-offline')">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-medium text-gray-900">A1.1 Offline</span>
+                                                <p class="text-xs text-gray-600">In-person, structured</p>
+                                            </div>
+                                            <div class="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="course-card-compact" onclick="toggleCourse(this, 'a1-2-online')">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-medium text-gray-900">A1.2 Online</span>
+                                                <p class="text-xs text-gray-600">Continue online</p>
+                                            </div>
+                                            <div class="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="course-card-compact" onclick="toggleCourse(this, 'a2-1-online')">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-medium text-gray-900">A2.1 Online</span>
+                                                <p class="text-xs text-gray-600">Intermediate level</p>
+                                            </div>
+                                            <div class="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="course-card-compact" onclick="toggleCourse(this, 'b1-1-online')">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-medium text-gray-900">B1.1 Online</span>
+                                                <p class="text-xs text-gray-600">Advanced beginner</p>
+                                            </div>
+                                            <div class="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="course-card-compact" onclick="toggleCourse(this, 'visa-service')">
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <span class="font-medium text-gray-900">Visa Service</span>
+                                                <p class="text-xs text-gray-600">Complete assistance</p>
+                                            </div>
+                                            <div class="w-5 h-5 border-2 border-gray-300 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                        <button type="button" onclick="closeAddStudentModal()" class="px-6 py-3 border-2 border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-all">
+                            Cancel
+                        </button>
+                        <button type="button" onclick="submitForm()" class="gradient-button">
+                            <i data-lucide="user-plus" class="h-4 w-4 inline mr-2"></i>
+                            Add New Learner
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedCourses = [];
+
+        // Modal functions
+        function openAddStudentModal() {
+            document.getElementById('addStudentModal').style.display = 'flex';
+            
+            // Reset form
+            selectedCourses = [];
+            resetForm();
+        }
+
+        function closeAddStudentModal() {
+            document.getElementById('addStudentModal').style.display = 'none';
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('modernForm').reset();
+            selectedCourses = [];
+            
+            // Reset course cards
+            document.querySelectorAll('.course-card-compact').forEach(card => {
+                card.classList.remove('selected');
+                const indicator = card.querySelector('.w-5.h-5');
+                indicator.style.background = '';
+                indicator.innerHTML = '';
+                indicator.style.borderColor = '#D1D5DB';
+            });
+        }
+
+        function toggleCourse(cardElement, courseId) {
+            const indicator = cardElement.querySelector('.w-5.h-5');
+            
+            if (selectedCourses.includes(courseId)) {
+                // Remove course
+                selectedCourses = selectedCourses.filter(id => id !== courseId);
+                cardElement.classList.remove('selected');
+                indicator.style.background = '';
+                indicator.innerHTML = '';
+                indicator.style.borderColor = '#D1D5DB';
+            } else {
+                // Add course
+                selectedCourses.push(courseId);
+                cardElement.classList.add('selected');
+                indicator.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                indicator.innerHTML = '✓';
+                indicator.style.color = 'white';
+                indicator.style.fontSize = '12px';
+                indicator.style.fontWeight = 'bold';
+                indicator.style.display = 'flex';
+                indicator.style.alignItems = 'center';
+                indicator.style.justifyContent = 'center';
+                indicator.style.borderColor = '#667eea';
+            }
+        }
+
+        function validateForm() {
+            const requiredFields = document.querySelectorAll('[required]');
+            
+            for (let field of requiredFields) {
+                if (!field.value.trim()) {
+                    field.focus();
+                    field.style.borderColor = '#EF4444';
+                    setTimeout(() => {
+                        field.style.borderColor = '';
+                    }, 3000);
+                    
+                    // Show error message
+                    const fieldName = field.labels[0]?.textContent || 'This field';
+                    alert(`${fieldName} is required.`);
+                    return false;
+                }
+            }
+            
+            // Check if at least one course is selected
+            if (selectedCourses.length === 0) {
+                alert('Please select at least one course of interest.');
+                return false;
+            }
+            
+            return true;
+        }
+
+        function submitForm() {
+            if (!validateForm()) {
+                return;
+            }
+            
+            // Collect all form data
+            const formData = {
+                fullName: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                country: document.getElementById('country').value,
+                city: document.getElementById('city').value,
+                funnelStep: document.getElementById('funnelStep').value,
+                platform: document.getElementById('platform').value,
+                selectedCourses: selectedCourses,
+                profileLink: document.getElementById('profileLink').value,
+                notes: document.getElementById('notes').value
+            };
+            
+            // Show success animation
+            const modal = document.querySelector('.modal-content');
+            modal.classList.add('success-animation');
+            
+            // Here you would typically send the data to your backend
+            console.log('New learner data:', formData);
+            
+            // Show success message
+            setTimeout(() => {
+                alert('🎉 Welcome aboard! New learner added successfully!');
+                closeAddStudentModal();
+            }, 600);
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('addStudentModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAddStudentModal();
+            }
+        });
+
+        // Handle keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('addStudentModal');
+            if (modal.style.display === 'flex') {
+                if (e.key === 'Escape') {
+                    closeAddStudentModal();
+                } else if (e.key === 'Enter' && e.ctrlKey) {
+                    submitForm();
+                }
+            }
+        });
+
+        // Add floating label behavior
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputs = document.querySelectorAll('.floating-label input, .floating-label select, .floating-label textarea');
+            
+            inputs.forEach(input => {
+                // Check if input has value on load
+                if (input.value) {
+                    input.classList.add('has-value');
+                }
+                
+                input.addEventListener('blur', function() {
+                    if (this.value) {
+                        this.classList.add('has-value');
+                    } else {
+                        this.classList.remove('has-value');
+                    }
+                });
+            });
+        });
+
+        lucide.createIcons();
+    </script>
+</body>
+</html> 

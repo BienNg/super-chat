@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Bookkeeping</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/lucide-icons@latest/dist/umd/lucide.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide-icons"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Bookkeeping Interface</h1>
+    
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="users"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <div class="h-16 border-b border-gray-200 px-6 flex items-center justify-between bg-white">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-semibold text-gray-800">Financial Overview</h1>
+                    <button class="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 flex items-center">
+                        <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                        Record Payment
+                    </button>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <select class="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>EUR</option>
+                        <option>VND</option>
+                    </select>
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="download" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-4 gap-6 p-6">
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Total Revenue</h3>
+                        <span class="text-green-500">
+                            <i data-lucide="trending-up" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">€24,500</span>
+                        <span class="ml-2 text-sm text-green-500">+12.5%</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">vs. previous month</div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Monthly Revenue</h3>
+                        <span class="text-green-500">
+                            <i data-lucide="trending-up" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">€8,250</span>
+                        <span class="ml-2 text-sm text-green-500">+5.3%</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">vs. previous month</div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Pending Payments</h3>
+                        <span class="text-yellow-500">
+                            <i data-lucide="clock" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">€3,800</span>
+                        <span class="ml-2 text-sm text-yellow-500">12 pending</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Due this month</div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-gray-500">Exchange Rate</h3>
+                        <span class="text-blue-500">
+                            <i data-lucide="refresh-cw" class="h-5 w-5"></i>
+                        </span>
+                    </div>
+                    <div class="flex items-baseline">
+                        <span class="text-2xl font-bold text-gray-900">1 EUR = 26,000 VND</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">Updated 5 mins ago</div>
+                </div>
+            </div>
+            
+            <!-- Recent Transactions -->
+            <div class="px-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">Recent Transactions</h2>
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-blue-500 flex-shrink-0 flex items-center justify-center text-white font-medium">JD</div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900">John Doe</div>
+                                            <div class="text-sm text-gray-500">john@example.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">A1.1 Morning Class</div>
+                                    <div class="text-sm text-gray-500">Full Course</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">€750</div>
+                                    <div class="text-sm text-gray-500">19,500,000 VND</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-02-15</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button class="text-indigo-600 hover:text-indigo-900">View Receipt</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 rounded-full bg-green-500 flex-shrink-0 flex items-center justify-center text-white font-medium">MT</div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900">Mai Tran</div>
+                                            <div class="text-sm text-gray-500">mai@example.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">B2.2 Evening Class</div>
+                                    <div class="text-sm text-gray-500">Partial Payment</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">€400</div>
+                                    <div class="text-sm text-gray-500">10,400,000 VND</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-02-14</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button class="text-indigo-600 hover:text-indigo-900">View Receipt</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Revenue Chart -->
+            <div class="p-6">
+                <div class="bg-white rounded-xl p-6 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Revenue Trend</h3>
+                        <select class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option>Last 7 Days</option>
+                            <option>Last 30 Days</option>
+                            <option>Last 90 Days</option>
+                        </select>
+                    </div>
+                    <div class="h-64 bg-gray-50 rounded-lg flex items-center justify-center text-gray-400">
+                        Chart Placeholder
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html> 

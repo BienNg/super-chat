@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Tasks (Empty)</title>
+    <!-- Base styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Icons - Updated Lucide implementation -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Chat Interface - Empty State</h1>
+    
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="message-square"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="users"></i>
+                </a>
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="dollar-sign"></i>
+                </a>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <a href="#" class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </a>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Channel Sidebar -->
+        <div class="w-64 bg-indigo-800 text-white flex flex-col">
+            <div class="p-4 border-b border-indigo-700">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold">Channels</h2>
+                    <button class="text-indigo-300 hover:text-white">
+                        <i data-lucide="plus" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-3">
+                <div class="bg-indigo-700 rounded-md flex items-center p-2">
+                    <i data-lucide="search" class="h-4 w-4 text-indigo-300 mr-2"></i>
+                    <input type="text" placeholder="Search channels" class="bg-transparent border-none text-sm text-white placeholder-indigo-300 focus:outline-none w-full" />
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto">
+                <div class="px-3 py-2">
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center py-1 px-2 rounded bg-indigo-600 text-white">
+                            <span class="text-sm"># A1.1 Morning Class</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># B2.2 Evening Class</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200">
+                            <span class="text-sm"># Teacher's Lounge</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="px-3 py-2 mt-4">
+                    <div class="flex items-center justify-between text-xs text-indigo-300 mb-2">
+                        <span class="font-semibold">DIRECT MESSAGES</span>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Sarah Johnson</span>
+                        </a>
+                        <a href="#" class="flex items-center py-1 px-2 rounded hover:bg-indigo-700">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Alex Chen</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="flex-1 flex flex-col bg-white">
+            <!-- Chat Header -->
+            <div class="h-14 border-b border-gray-200 px-4 flex items-center justify-between">
+                <div class="flex items-center">
+                    <h3 class="font-semibold text-gray-800">#G38</h3>
+                    <span class="ml-2 text-sm text-gray-500">5 members</span>
+                </div>
+                
+                <!-- Tab Navigation -->
+                <div class="flex items-center space-x-1">
+                    <a href="chat-messages-empty.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Messages</a>
+                    <a href="chat-classes-empty.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Classes</a>
+                    <button class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">Tasks</button>
+                    <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Wiki</button>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="more-horizontal" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Tasks Screen -->
+            <div id="tasks-screen" class="flex-1 flex flex-col">
+                <!-- Left Panel - Messages with Tasks -->
+                <div class="flex h-full">
+                    <div class="w-1/2 border-r border-gray-200 overflow-y-auto">
+                        <div class="p-4 border-b border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900">Messages with Tasks</h3>
+                        </div>
+                        <!-- Empty State for Tasks -->
+                        <div class="flex flex-col items-center justify-center h-[calc(100%-65px)] p-8 text-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <i data-lucide="check-circle" class="h-8 w-8 text-gray-400"></i>
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No tasks yet</h3>
+                            <p class="text-gray-500 mb-4">Create tasks by marking messages with the task icon or using the "Create Task" button.</p>
+                            <button class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                                Create Task
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right Panel - Task Details -->
+                    <div class="w-1/2 flex flex-col h-full">
+                        <div class="p-4 border-b border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold text-gray-900">Task Details</h3>
+                            </div>
+                        </div>
+                        <!-- Empty State for Task Details -->
+                        <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <i data-lucide="clipboard" class="h-8 w-8 text-gray-400"></i>
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Select a task</h3>
+                            <p class="text-gray-500">Choose a task from the left panel to view its details and updates.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons({
+            attrs: {
+                class: ["lucide"],
+                strokeWidth: "2",
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,665 @@
+**Main Goal**: Architecting a dynamic, configurable language school management platform with integrated messaging, CRM, and bookkeeping and task management systems. Important: This app is only used by employeed of my company. No customer will use it.
+
+# Current Tech Choices
+
+## Frontend:
+
+- **Framework**: React.js
+- **Rich Text Editor**: React-Quill (Quill.js) for rich text editing
+- **UI Framework**: Tailwind CSS with Lucide icons
+- **Key Dependencies**:
+    - `tribute` - @mentions autocomplete with DOM integration
+    - `@joeattardi/emoji-button` - emoji picker interface
+    - `draft-js` - rich text editing with React integration
+
+## Backend:
+
+- **Framework**: Firebase (Backend-as-a-Service)
+    - Firebase Authentication for user management
+    - **Firestore** for persistent data (messages, tasks, user profiles, channel data)
+        - Pure Firestore approach with optimized real-time listeners
+        - Firestore: ALL data including presence (using server timestamps and TTL)
+        - Presence managed via Firestore documents with automatic cleanup
+        - Better scalability, single security rule system, unified querying
+    - Firebase Storage for file uploads
+    - Firebase Hosting for deployment
+    - Firebase Cloud Functions for server-side logic
+
+## Search Strategy:
+
+- **Phase 1**: Firestore compound queries for basic channel search
+- **Phase 2**: Algolia integration for advanced search (when needed at scale)
+
+## Architecture Notes:
+
+- **Unified Threading System**: Single message reply structure serves both Messages and Tasks tabs
+- **Bundle Optimization**: Code splitting for rich text editor and emoji picker
+
+## Development Environment:
+
+- **IDE**: [Cursor.ai](http://cursor.ai/) on macOS
+- **Package Manager**: npm
+- **Repository**: GitHub (username: BienNg)
+- **Project Directory**: ~/chatter
+
+---
+
+## MVP Flow (with some post MVP features)
+
+1. **User Authentication** → Firebase Auth with role-based access
+2. **Role Selection + Admin Configuration Access** → Enhanced onboarding with admin config capabilities
+3. **Three-Section Navigation** → Chat/CRM/Bookkeeping single-view navigation (will get more tabs later on)
+4. **Dynamic Channel Type Management** → Admin-configurable channel types with custom tab templates
+5. **Enhanced Channel Discovery** → Role + channel-type filtered discovery
+6. **Class Channel Onboarding Flow** → Multi-step class creation (with Google Sheets integration post mvp)
+7. **Real-Time Messaging with Comments** → Enhanced messaging with comment threading and task management integration
+8. **CRM Customer Management** →  customer tracking system 
+9. **Simple Bookkeeping** → Multi-currency income tracking with student-course linking  (post-mvp)
+10. **Google Sheets Sync** → Periodic bidirectional sync with conflict resolution (post-mvp)
+
+---
+
+# Launch Features specification (MVP)
+
+## **Firebase Authentication**
+
+*Secure user registration and login system with email/password and Google (Gmail) authentication. Integrates with Firebase Auth for seamless user management and session handling.*
+
+- Email/password authentication flow
+- **Google Sign-In using Firebase Auth**
+- User profile creation with role assignment
+- Persistent login sessions across browser refreshes
+- Password reset functionality
+
+### Tech Involved
+
+- Firebase Authentication
+- Zustand for global state management (auth, UI state, cross-tab coordination)
+- React Context API only for component-level state
+- Optimized selectors to prevent unnecessary re-renders
+- Persistent state for tab preferences
+- Firebase `GoogleAuthProvider` for OAuth login
+- Protected route components
+
+### Main Requirements
+
+- Firebase project setup with Auth enabled
+- **Google Sign-In enabled in Firebase console**
+- Environment variables for Firebase config
+- Auth context provider wrapping the app
+- **Google Sign-In button triggering Firebase popup login**
+
+---
+
+## Role-Based Onboarding (onboarding.html)
+
+*Mandatory role selection modal that appears after first login, blocking app access until completed. Determines which channels and features users can access throughout the platform.*
+
+- Multi-select role picker interface
+- Persistent storage of user roles in Firestore
+- Blocks app navigation until roles are selected
+- Admin ability to modify user roles post-onboarding
+
+### Tech Involved
+
+- React Modal component
+- Firestore user document updates
+- Zustand for global state management (auth, UI state, cross-tab coordination)
+
+### Main Requirements
+
+- Predefined role taxonomy (developer, designer, manager, etc.)
+- Firestore security rules based on user roles
+- UI state management for modal visibility
+
+---
+
+# Real-Time Channel Messaging Feature Specification (chat-messages.html)
+
+## Overview
+
+*Live chat functionality within role-filtered channels using Firestore real-time listeners. Messages appear instantly across all connected clients with proper timestamp ordering and comprehensive interaction capabilities.*
+
+## Core Real-Time Features
+
+- **Real-time message sending and receiving** - instant message delivery across all connected clients
+- **Channel-based message organization** - messages organized by channel with role-based access
+- **Message history persistence** - complete message history stored in Firestore
+- **Typing indicators and online status** - live presence indicators for active users
+
+## Message Interaction Features
+
+- **Message hover actions** with the following options:
+    - React - add emoji reactions to messages
+    - Reply - create threaded responses
+    - Forward - share messages across channels
+    - More options - additional context menu
+    - **Push to Tasks** - convert messages into task management system items
+- **Message reactions/emoji responses** - persistent emoji reactions with user attribution
+- **Message forwarding capability** - cross-channel message sharing with source tracking
+- **Message threading/replies** - nested conversation support with reply chains
+
+## Rich Text Formatting
+
+- **Complete formatting toolbar** supporting:
+    - Bold, Italic, Strikethrough text formatting
+    - Hyperlink insertion and management
+    - Bullet lists and numbered lists
+    - Text indentation controls
+- **File attachment system** - drag-and-drop file uploads with preview cards
+- **Image sharing functionality** - camera button for quick image capture and sharing
+- **Advanced text editor** with contenteditable and formatting preservation
+- **Message composition persistence** - draft saving during typing
+
+## Search & Navigation
+
+- **Channel search functionality** - real-time search within channel sidebar
+- **Multi-tab interface** navigation between:
+    - Messages - primary chat interface
+    - Classes - educational content management
+    - Tasks - integrated task management
+    - Wiki - knowledge base access
+- **Direct Messages section** with real-time online status indicators
+- **Channel notification badges** - unread message counts with visual indicators
+
+## User Experience Enhancements
+
+- **@Mentions system** - user tagging with autocomplete and push notifications
+- **Message bookmarking** - save important messages and external links
+- **Message pinning** - pin button for important messages at channel top
+- **Comprehensive emoji picker** - full emoji selection with categories and search
+- **Message timestamps** - relative and absolute time display
+- **User avatars and profiles** - visual user identification
+- **Keyboard shortcuts** - efficient message composition and navigation
+
+## Technical Stack
+
+### Backend Requirements
+
+- **Firestore real-time listeners** - live message synchronization
+- **Firebase Storage** - file and image attachment handling
+- **Firebase serverTimestamp** - consistent message ordering across clients
+- **Firebase Authentication** - user session management
+
+### Frontend Dependencies & Architecture
+
+- **React hooks** - message state management and UI updates
+- **Rich Text Editor** - React-Quill (Quill.js) for rich text editing
+- **User Interaction Libraries**:
+    - **Tribute.js** - @mentions autocomplete functionality (critical dependency)
+    - **@joeattardi/emoji-button** - emoji picker interface
+    - *Integration Note*: Tribute.js has specific DOM requirements and affects build process
+- **UI Framework**: Tailwind CSS with Lucide icons for consistent styling
+- **File Handling**: Firebase Storage SDK for attachment management
+
+### Data Architecture & Technical Implementation
+
+- **Message Threading**: Firestore document references for reply chains
+    - Structure: `parentMessageId` field linking to thread origins
+- **Reaction System**: Firestore array fields or subcollections for emoji reactions
+    - User attribution and reaction counts tracking
+- **Search Integration**:
+    - Firestore compound queries for basic search
+    - Algolia integration for advanced channel search capabilities
+- **Cross-system APIs**: Integration endpoints for task management system
+    - RESTful endpoints for message-to-task conversion
+
+### Performance & Bundle Considerations
+
+- **Code Splitting** - Rich text editor loaded on demand
+- **Bundle Optimization** - Emoji picker and mentions libraries affect bundle size
+- **Build Process Impact** - Tribute.js and emoji picker require specific webpack configurations
+
+## Core Requirements
+
+### Data Structure
+
+- **Firestore subcollections** - `/channels/{channelId}/messages/{messageId}`
+- **Message Threading Structure** - parent/child message relationships with references
+- **Reaction Tracking and Persistence** - user attribution for emoji responses
+- **File Upload and Preview System** - metadata storage and permissions
+- **Thread/Reply Data Structure** - nested conversation organization
+
+### Real-Time Functionality
+
+- **Optimistic UI updates** - immediate message display before server confirmation
+- **Message pagination** - lazy loading for performance with large message histories
+- **Live message delivery** - sub-second message propagation
+- **Typing indicators** - Presence and typing managed via Firestore documents with automatic cleanup
+- **Online presence** - accurate user availability status
+
+### Integration Requirements
+
+- **Cross-system integration** - seamless task management system connectivity
+- **File preview system** - in-chat document and image preview
+- **Notification system** - push notifications for mentions and DMs
+- **Export functionality** - message history download capabilities
+
+### Security & Performance
+
+- **Role-based channel access** - teacher/student permission levels
+- **Message moderation** - content filtering and admin controls
+- **Rate limiting** - spam prevention mechanisms
+- **Offline support** - message queuing when connection lost
+
+## Technical Dependencies Rationale
+
+**Why These Specific Libraries Matter:**
+
+- **Tribute.js** - Critical for @mentions; has specific DOM integration requirements that affect component architecture
+- **Emoji picker library** - Significant impact on bundle size and performance; needs careful integration with React lifecycle
+- Pure Firestore approach with optimized real-time listeners
+    - Firestore: ALL data including presence (using server timestamps and TTL)
+    - Presence managed via Firestore documents with automatic cleanup
+    - Better scalability, single security rule system, unified querying
+
+## Success Criteria
+
+- Messages deliver in <500ms across all clients
+- Support for 100+ concurrent users per channel
+- Rich text formatting preserved across all devices
+- File attachments up to 25MB supported
+- 99.9% message delivery reliability
+- Mobile-responsive interface with full feature parity
+- @Mentions autocomplete response time <100ms
+- Emoji picker loads in <200ms
+
+---
+
+# Feature Specification: Multi-Tab Channel Interface
+
+## Overview
+
+*Each channel contains four distinct tabs (Messages, Tasks, Wiki, Classes - this can be added optionally) with independent data and functionality. Users can switch between tabs while maintaining channel context and state persistence.*
+
+## Core Tab Navigation Features
+
+- **Tab navigation within channels** - seamless switching between Messages, Tasks, Wiki, and Classes tabs
+- **Independent data loading per tab** - each tab maintains its own data lifecycle and loading states
+- **State persistence when switching tabs** - user input, scroll position, and form data preserved during navigation
+- **Role-based tab visibility** - conditional tab display based on user permissions and channel configuration
+- **Active tab visual indicators** - clear visual feedback with border highlights and color changes
+
+## Tab Architecture & Structure
+
+### Primary Tab Navigation
+
+- **Messages Tab** - Real-time messaging interface (always visible)
+- **Classes Tab** - Class management with nested sub-tabs (conditional visibility)
+- **Tasks Tab** - Task management and message-to-task conversion (always visibility)
+- **Wiki Tab** - Knowledge base and documentation (always visibility)
+
+### Nested Sub-Tab Support
+
+- **Classes Tab Sub-navigation**:
+    - Courses sub-tab - Course overview, calendar, and student lists
+    - Info sub-tab - Class details, teacher management, and enrollment data
+- **Independent sub-tab state management** - sub-tab switching within parent tab context
+- **Sub-tab content containers** - dedicated content areas with proper show/hide logic
+
+## URL Structure & Routing
+
+### Nested Routing Architecture
+
+- **Primary route structure**: `channels/{channelId}/{tabName}`
+- **Sub-tab route structure**: `channels/{channelId}/classes/{subTab}`
+- **Default routing behavior**:
+    - New channels default to Messages tab
+    - Returning users load last active tab
+    - Invalid tabs redirect to Messages with error handling
+
+### Route State Management
+
+- **Browser history integration** - back/forward button support for tab navigation
+- **URL state synchronization** - tab changes update URL without page refresh
+- **Deep linking support** - direct access to specific tabs via URL
+- **Query parameter handling** - additional state like search filters preserved in URL
+
+## Technical Implementation
+
+### Frontend Architecture
+
+- **React Router for tab navigation** - nested route configuration with tab-specific components
+- **Context API for tab state** - shared state management across tab components
+- **Lazy loading of tab content** - dynamic imports for tab components to optimize bundle size
+- **Component lifecycle management** - proper mounting/unmounting of tab-specific resources
+
+### Data Management
+
+- **Firestore subcollections per tab type** - organized data structure per tab functionality
+- **Independent API calls per tab** - separate data fetching strategies for each tab
+- **Caching strategy per tab** - tab-specific data caching to improve performance
+- **Real-time listeners per tab** - selective real-time updates based on active tab
+
+### State Persistence
+
+- **Local storage integration** - persist tab preferences and draft content
+- **Session storage for temporary state** - maintain scroll positions and form inputs
+- **Cross-tab data synchronization** - shared channel data accessible across all tabs
+- **Draft preservation** - unsaved content maintained during tab switching
+
+## User Interface Specifications
+
+### Tab Navigation Bar
+
+- **Consistent navigation UI across tabs** - standardized tab header with channel context
+- **Visual hierarchy**:
+    - Active tab: `text-indigo-600 border-b-2 border-indigo-600`
+    - Inactive tabs: `text-gray-500 hover:text-gray-700`
+- **Tab spacing and sizing** - `px-4 py-2 text-sm font-medium` for consistent touch targets
+- **Channel context preservation** - channel name, member count, and status displayed above tabs
+
+### Content Area Management
+
+- **Tab content containers** - dedicated divs with unique IDs for each tab (`#messages-screen`, `#classes-screen`, etc.)
+- **Content visibility logic** - JavaScript-controlled show/hide with proper CSS classes
+- **Loading state indicators** - skeleton screens during tab content loading
+- **Error boundary handling** - graceful error display if tab content fails to load
+
+### Responsive Design
+
+- **Mobile tab navigation** - collapsible or horizontal scroll for narrow screens
+- **Tablet optimization** - appropriate tab sizing for medium screen devices
+- **Desktop experience** - full tab visibility with optimal spacing
+
+## Performance & Optimization
+
+### Loading Strategy
+
+- **Lazy loading implementation** - tab components loaded on first access
+- **Code splitting per tab** - separate JavaScript bundles for each tab type
+- **Progressive enhancement** - basic functionality loads first, enhanced features follow
+- **Prefetching strategy** - likely-to-be-accessed tabs preloaded in background
+
+### Memory Management
+
+- **Component cleanup** - proper unmounting of unused tab components
+- **Event listener management** - removal of tab-specific event listeners on switch
+- **Cache invalidation** - appropriate cache clearing when switching contexts
+
+## Accessibility & UX
+
+### Keyboard Navigation
+
+- **Tab key support** - keyboard navigation between tabs using standard Tab key
+- **Arrow key navigation** - left/right arrows for tab switching
+- **Enter key activation** - keyboard activation of selected tabs
+- **Focus management** - proper focus handling during tab transitions
+
+### Animation & Transitions
+
+- **Tab switching transitions** - smooth content transitions between tabs
+- **Loading animations** - visual feedback during tab content loading
+- **Micro-interactions** - subtle hover effects and state changes
+
+## Integration Requirements
+
+### Cross-Tab Data Flow
+
+- **Channel-level data sharing** - member lists, permissions, settings accessible across tabs
+- **Real-time synchronization** - changes in one tab reflected in relevant other tabs
+- **Notification system** - cross-tab notifications for relevant updates
+
+### External System Integration
+
+- **Firebase Authentication** - consistent user context across all tabs
+- **Firestore Security Rules** - tab-specific data access permissions
+- **File Storage Integration** - shared file access across relevant tabs
+
+## Success Criteria
+
+- **Tab switching performance** - sub-200ms tab transitions
+- **State persistence reliability** - 99.9% success rate for preserving user input during tab switches
+- **Cross-browser compatibility** - consistent behavior across Chrome, Firefox, Safari, Edge
+- **Mobile responsiveness** - full functionality maintained on mobile devices
+- **Memory efficiency** - no memory leaks during extended tab switching sessions
+- **URL integrity** - deep linking works 100% reliably for all tab combinations
+
+## Error Handling & Edge Cases
+
+### Network Connectivity
+
+- **Offline tab behavior** - graceful degradation when network unavailable
+- **Connection recovery** - automatic sync when connectivity restored
+- **Partial load handling** - appropriate fallbacks when tab content partially loads
+
+### Permission Changes
+
+- **Dynamic tab visibility** - tabs appear/disappear based on real-time permission changes
+- **Graceful tab removal** - smooth transition when user loses access to current tab
+- **Permission error handling** - clear messaging when tab access denied
+
+### Browser Compatibility
+
+- **Local storage alternatives** - cookie fallbacks for browsers with disabled local storage
+- **Progressive enhancement** - basic tab functionality works without JavaScript
+
+---
+
+# Feature Specification: Task Management with Message Integration
+
+## Overview
+
+*Message-to-task conversion system with unified threading architecture. Tasks are created from channel messages and utilize existing message reply threads as task conversations, creating a seamless bidirectional experience between Messages and Tasks tabs.*
+
+## Core Task Creation Features
+
+- **"Push to Tasks" button in message hover menu** - Convert any message into a task with full context preservation
+- **Automatic task creation with message context** - Source message content, timestamp, sender, and thread context preserved
+- **Bidirectional linking between messages and tasks** - Tasks reference source messages, messages show task creation status
+- **Visual task indicator badge on converted messages** - Clear visual feedback when message becomes a task
+
+## Unified Threading System
+
+- **Single source of truth for conversations** - Message replies serve as both message threads AND task conversations
+- **Bidirectional real-time synchronization** - Changes in Messages tab thread instantly appear in Tasks tab and vice versa
+- **Shared reply functionality** - Same reply composer and threading interface used in both tabs
+- **Unified @mention handling** - Mentions in message replies automatically add participants to associated tasks
+- **Thread state consistency** - Reply count, latest activity, and thread status synchronized across both interfaces
+- **No separate task comments** - Task conversations ARE the existing message reply threads
+
+## Dynamic Participant Management
+
+- **Auto-assignment via @mentions in reply threads** - Anyone mentioned in source message or reply thread automatically becomes task participant
+- **Visual participant list with manual removal capability** - Display current task assignees with option to remove manually
+- **Real-time participant updates** - Live addition/removal of participants synchronized across all clients
+- **Participant avatar display** - Visual representation of current task assignees in task interface
+- **Channel member validation** - Participant assignment limited to current channel members
+- **Cross-tab mention notifications** - Push notifications when users are added to tasks via thread mentions
+
+## Two-Panel Task Interface
+
+### Left Panel: Messages with Tasks
+
+- **Task-converted message list** - Display all messages that have been converted to tasks
+- **Task preview cards** - Show task title, participant count, recent reply activity, and source message preview
+- **Task selection and highlighting** - Active task visual indication with proper state management
+- **Task search and filtering** - Real-time search within channel's task collection
+- **Empty state handling** - Appropriate placeholder when no tasks exist in channel
+
+### Right Panel: Unified Thread Display
+
+- **Message reply thread viewer** - Display existing message replies as task conversation
+- **Source message preservation** - Display original message that created the task
+- **"Jump to message" functionality** - Direct navigation link to source message thread in Messages tab
+- **Shared reply composer** - Same message reply interface used in Messages tab
+- **Participant management interface** - Visual list of current assignees with removal options
+- **Thread empty state** - Appropriate placeholder for tasks without replies
+
+## Message-Task Integration Features
+
+- **Task creation button integration** - "Push to Tasks" appears in message hover menu alongside React, Reply, Forward options
+- **Message task badge display** - Visual indicator on converted messages showing task status
+- **Cross-tab thread notifications** - Thread reply notifications visible in both Messages and Tasks tabs
+- **Unified thread navigation** - Seamless switching between viewing thread as message replies or task conversation
+
+## Technical Implementation
+
+### Firestore Data Architecture
+
+```jsx
+
+javascript
+// Simplified task document - no separate comments
+/channels/{channelId}/tasks/{taskId}
+{
+  id: taskId,
+  title: "Auto-generated from message content",
+  sourceMessageId: messageId,// Points to threaded message
+  sourceMessageData: {
+    content: "Original message text",
+    sender: {userId, displayName, avatar},
+    timestamp: serverTimestamp,
+    replyCount: number// Synced with message reply count
+  },
+  participants: [
+    {userId: "user1", addedAt: timestamp, addedBy: "mention"},
+    {userId: "user2", addedAt: timestamp, addedBy: "manual"}
+  ],
+  createdAt: serverTimestamp,
+  createdBy: userId,
+  lastActivity: serverTimestamp// Synced with latest reply timestamp
+}
+
+// Existing message replies serve as task conversations
+/channels/{channelId}/messages/{messageId}/replies/{replyId}
+{
+// Same structure as current message replies// Serves BOTH message threading AND task conversations
+  id: replyId,
+  content: "Reply content with rich formatting",
+  author: {userId, displayName, avatar},
+  timestamp: serverTimestamp,
+  mentions: [userId1, userId2],// Auto-adds task participants
+  reactions: [],
+  parentMessageId: messageId
+}
+
+// Message with task reference
+/channels/{channelId}/messages/{messageId}
+{
+// ... existing message fields
+  taskId: taskId || null,// Reference to created task
+  isTask: boolean,// Quick lookup flag
+  replyCount: number// Shared with task system
+}
+
+```
+
+### React Component Architecture
+
+```jsx
+
+javascript
+// Core task components with unified threading
+- TaskTab - Main task interface with two-panel layout
+- TaskList - Left panel displaying messages with tasks
+- TaskThreadViewer - Right panel showing message reply thread (shared component)
+- SharedReplyComposer - Same reply interface used in Messages and Tasks tabs
+- TaskParticipants - Participant list management interface
+
+// Shared threading components
+- MessageThread - Unified component for both message replies and task conversations
+- ThreadReply - Individual reply component used in both contexts
+- ThreadComposer - Shared reply input component
+
+// Integration components
+- MessageTaskButton - "Push to Tasks" hover menu button
+- MessageTaskBadge - Visual indicator on converted messages
+- TaskMessageLink - Navigation between tasks and source message threads
+
+```
+
+### Firebase Integration Requirements
+
+```jsx
+
+javascript
+// Unified real-time listeners
+- TaskList listener: `/channels/{channelId}/tasks` - ordered by lastActivity
+- SharedThread listener: `/channels/{channelId}/messages/{messageId}/replies` - serves both Messages and Tasks tabs
+- Task participant updates: Real-time participant array changes
+- Cross-tab thread synchronization: Reply activity updates both message and task views
+
+// Cloud Functions for unified system
+- onMessageReplyCreate - Handle @mention participant addition for associated tasks
+- onMessageToTaskConvert - Create task reference to existing threaded message
+- onThreadMention - Unified notification system for both message and task contexts
+- syncTaskActivity - Update task lastActivity when replies added to source message
+
+```
+
+### Security Rules
+
+```jsx
+
+javascript
+// Unified access control
+- Message reply access: Same rules apply whether viewed as message thread or task conversation
+- Task participant management: Task creator and channel moderators
+- Thread reply permissions: Channel members (affects both message and task views)
+- Cross-context consistency: Same user permissions apply in both Messages and Tasks tabs
+
+```
+
+## User Interface Specifications
+
+### Unified Thread Experience
+
+- **Consistent reply interface** - Same threading UI whether accessed from Messages or Tasks tab
+- **Cross-tab visual indicators** - Clear indication when thread activity affects both message and task contexts
+- **Seamless navigation** - "Jump to message" maintains thread context and scroll position
+- **Shared thread state** - Reply count, latest activity, and read status synchronized
+
+### Task Creation Flow
+
+- **Thread context preservation** - Converting threaded messages maintains all existing replies as task conversation
+- **Participant inheritance** - Users mentioned in existing thread automatically become task participants
+- **Activity synchronization** - Future thread replies update both message and task activity timestamps
+
+### Cross-Tab Integration
+
+- **Unified thread notifications** - Single notification system serves both message and task reply contexts
+- **Shared thread badges** - Reply count and activity indicators consistent across tabs
+- **Context switching** - Smooth transitions between viewing same thread in different tab contexts
+
+## Performance & Optimization
+
+### Unified System Efficiency
+
+- **Single data source** - No duplicate conversation data, reducing Firestore reads/writes
+- **Shared real-time listeners** - Single reply thread listener serves both Messages and Tasks interfaces
+- **Consistent caching** - Thread data cached once, used in both contexts
+- **Reduced complexity** - Simplified architecture with fewer data synchronization points
+
+### Memory Management
+
+- **Shared component instances** - Thread components reused between Messages and Tasks contexts
+- **Unified listener cleanup** - Single set of listeners to manage for thread functionality
+- **Consistent state management** - Thread state shared between tab contexts reduces memory overhead
+
+## Integration Requirements
+
+### Cross-System Unified Flow
+
+- **Single threading system** - Message reply functionality serves both messaging and task conversation needs
+- **Unified mention detection** - @mention system works consistently whether in message or task context
+- **Shared notification system** - Single notification pipeline for thread activity regardless of viewing context
+- **Consistent rich text editing** - Same formatting capabilities in both message replies and task conversations
+
+## Success Criteria
+
+- **Thread synchronization performance** - Sub-200ms sync between Messages and Tasks tab thread views
+- **Unified real-time delivery** - Thread replies appear instantly in both contexts within 500ms
+- **Cross-tab consistency** - 100% reliable thread state synchronization between Messages and Tasks interfaces
+- **Participant management accuracy** - Thread mentions automatically update task participants with 100% reliability
+- **Navigation continuity** - Seamless context switching between message thread and task conversation views
+- **Memory efficiency** - Unified system uses 30% fewer resources than separate conversation systems
+
+## Error Handling & Edge Cases
+
+### Unified System Edge Cases
+
+- **Thread-task desynchronization** - Recovery mechanisms if thread and task states diverge
+- **Cross-context permission changes** - Handle cases where user loses access to message but retains task access
+- **Thread deletion with active tasks** - Graceful handling when source message thread is deleted
+- **Participant management conflicts** - Resolution when thread mentions conflict with manual task participant removal

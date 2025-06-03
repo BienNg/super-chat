@@ -1,0 +1,689 @@
+# UX/UI Style Guide
+
+## Communication Platform Design System
+
+**Executive Summary**: This system balances the familiarity of tools like Slack with the specialized needs of educational institutions, featuring robust multi-tab architecture, real-time messaging capabilities, and comprehensive task management.
+
+---
+
+## 1. Design Philosophy & Principles
+
+### Core Design Philosophy
+
+**"Professional Communication Made Intuitive"** - Creating a platform that feels both familiar and innovative, where complex educational workflows feel effortless.
+
+### Key Principles
+
+- **Contextual Intelligence**: Every interface element adapts to user roles and current context
+- **Progressive Disclosure**: Complex functionality revealed only when needed
+- **Unified Threading**: Single conversation system serves both messaging and task management
+- **Educational Focus**: Purpose-built for teaching environments and student management
+
+---
+
+## 2. Visual Identity
+
+### Brand Identity
+
+- **Primary Brand Color**: Indigo (`#6366F1`)
+- **Brand Personality**: Professional, approachable, intelligent, reliable
+- **Visual Language**: Clean, modern, with purposeful depth and spatial awareness
+
+### Logo & Brand Mark
+
+- **Symbol**: Message square icon in rounded rectangle container
+- **Application**: White icon on indigo background for primary placements
+- **Sizing**: 40px × 40px for sidebar navigation, 48px × 48px for headers
+
+---
+
+## 3. Color System
+
+### Primary Color Palette
+
+```css
+
+css
+/* Indigo Scale - Primary Brand */
+--indigo-50:  #EEF2FF
+--indigo-100: #E0E7FF
+--indigo-600: #6366F1/* Primary Brand */
+--indigo-700: #5B21B6/* Active States */
+--indigo-800: #4C1D95/* Hover States */
+--indigo-900: #312E81/* Navigation Background */
+
+```
+
+### Functional Colors
+
+```css
+
+css
+/* Success States */
+--green-500: #10B981
+--green-100: #D1FAE5
+
+/* Warning States */
+--yellow-500: #F59E0B
+--yellow-100: #FEF3C7
+
+/* Error States */
+--red-500: #EF4444
+--red-100: #FEE2E2
+
+/* Neutral Scale */
+--gray-50:  #F9FAFB
+--gray-100: #F3F4F6
+--gray-200: #E5E7EB
+--gray-500: #6B7280
+--gray-700: #374151
+--gray-900: #111827
+
+```
+
+### Avatar & User Identity Colors
+
+Systematic color assignment for user avatars across 8 distinct hues:
+
+- Blue (`#3B82F6`), Green (`#10B981`), Purple (`#8B5CF6`), Pink (`#EC4899`)
+- Yellow (`#F59E0B`), Red (`#EF4444`), Orange (`#F97316`), Teal (`#14B8A6`)
+
+---
+
+## 4. Typography System
+
+### Font Family
+
+```css
+
+css
+font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+```
+
+### Typography Scale
+
+```css
+
+css
+/* Headers */
+.text-3xl: 30px/36px (Page Titles)
+.text-2xl: 24px/32px (Section Headers)
+.text-xl:  20px/28px (Component Headers)
+.text-lg:  18px/28px (Subsection Headers)
+
+/* Body Text */
+.text-base: 16px/24px (Primary Body)
+.text-sm:   14px/20px (Secondary Text, UI Labels)
+.text-xs:   12px/16px (Metadata, Timestamps)
+
+/* Weight System */
+font-weight: 400 (Regular)
+font-weight: 500 (Medium - UI Elements)
+font-weight: 600 (Semibold - Headers)
+font-weight: 700 (Bold - Emphasis)
+
+```
+
+---
+
+## 5. Spacing & Layout System
+
+### Spacing Scale (Tailwind-based)
+
+```css
+
+css
+--space-1:  4px/* Micro spacing */
+--space-2:  8px/* Small spacing */
+--space-3:  12px/* Default spacing */
+--space-4:  16px/* Component spacing */
+--space-6:  24px/* Section spacing */
+--space-8:  32px/* Large spacing */
+--space-16: 64px/* Page-level spacing */
+
+```
+
+### Layout Architecture
+
+- **Sidebar Navigation**: 64px wide (16 × 4px grid)
+- **Channel Panel**: 256px wide (64 × 4px grid)
+- **Main Content**: Flexible width with max-width constraints
+- **Component Padding**: 16px standard, 24px for expanded areas
+
+---
+
+## 6. Component Library
+
+### 6.1 Navigation Components
+
+### Primary Sidebar Navigation
+
+```css
+
+css
+.sidebar-nav {
+  width: 64px;
+  background: var(--indigo-900);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.nav-item {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--indigo-300);
+  transition: all 0.2s ease;
+}
+
+.nav-item.active {
+  background: var(--indigo-700);
+  color: white;
+}
+
+.nav-item:hover {
+  background: var(--indigo-800);
+  color: white;
+}
+
+```
+
+### Channel Sidebar
+
+```css
+
+css
+.channel-sidebar {
+  width: 256px;
+  background: var(--indigo-800);
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-item {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.channel-item.active {
+  background: var(--indigo-600);
+}
+
+.channel-item:hover {
+  background: var(--indigo-700);
+}
+
+```
+
+### 6.2 Tab Navigation System
+
+### Primary Tab Navigation
+
+Used for main content area navigation (Messages, Classes, Tasks, Wiki)
+
+```css
+
+css
+.tab-navigation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.tab-item {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-500);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tab-item.active {
+  color: var(--indigo-600);
+  border-bottom-color: var(--indigo-600);
+}
+
+.tab-item:hover {
+  color: var(--gray-700);
+}
+
+```
+
+### Secondary Tab Navigation
+
+Used for sub-navigation within tabs (e.g., Classes → Info)
+
+```css
+
+css
+.sub-tab-navigation {
+  padding-left: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.sub-tab-item {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+/* Inherits primary tab styling */
+}
+
+```
+
+### 6.3 Message Components
+
+### Message Container
+
+```css
+
+css
+.message-container {
+  position: relative;
+  padding: 8px;
+  margin: -8px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.message-container:hover {
+  background-color: var(--gray-50);
+}
+
+.message-hover-options {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: none;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message-container:hover .message-hover-options {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+```
+
+### User Avatar System
+
+```css
+
+css
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* Size Variants */
+.avatar-sm { width: 24px; height: 24px; font-size: 12px; }
+.avatar-md { width: 32px; height: 32px; font-size: 14px; }
+.avatar-lg { width: 40px; height: 40px; font-size: 16px; }
+
+```
+
+### 6.4 Form Components
+
+### Rich Text Input System
+
+```css
+
+css
+.message-input {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.message-input:focus-within {
+  border-color: var(--indigo-600);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.toolbar-button {
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--gray-600);
+  transition: all 0.2s ease;
+}
+
+.toolbar-button:hover {
+  background: var(--gray-100);
+  color: var(--gray-800);
+}
+
+.toolbar-button.active {
+  background: var(--indigo-50);
+  color: var(--indigo-600);
+}
+
+```
+
+### Button System
+
+```css
+
+css
+/* Primary Button */
+.btn-primary {
+  background: var(--indigo-600);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--indigo-700);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background: white;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+/* Inherits other primary button styles */
+}
+
+.btn-secondary:hover {
+  background: var(--gray-50);
+}
+
+```
+
+### 6.5 Data Display Components
+
+### Status Indicators
+
+```css
+
+css
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-active {
+  background: var(--green-100);
+  color: var(--green-800);
+}
+
+.status-pending {
+  background: var(--yellow-100);
+  color: var(--yellow-800);
+}
+
+.status-inactive {
+  background: var(--gray-100);
+  color: var(--gray-800);
+}
+
+```
+
+### Card Components
+
+```css
+
+css
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--gray-200);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: between;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+```
+
+---
+
+## 7. Interactive States & Behaviors
+
+### Hover States
+
+- **Subtle Background Changes**: Use gray-50 (`#F9FAFB`) for gentle hover states
+- **Button Hovers**: Darken by one shade level (600→700, 700→800)
+- **Navigation Hovers**: Always provide visual feedback with background/color changes
+
+### Focus States
+
+- **Primary Focus Ring**: 2px solid indigo-200 with 2px offset
+- **Interactive Elements**: Always include keyboard-accessible focus indicators
+
+### Loading States
+
+- **Skeleton Screens**: Use gray-200 background with subtle animation
+- **Button Loading**: Replace text with spinner, maintain button dimensions
+- **Progressive Loading**: Show content as it becomes available
+
+### Transition Standards
+
+```css
+
+css
+/* Standard Transitions */
+transition: all 0.2s ease;/* General UI elements */
+transition: background-color 0.15s ease;/* Background changes */
+transition: transform 0.3s ease;/* Modal animations */
+
+```
+
+---
+
+## 8. Responsive Design Specifications
+
+### Breakpoint System
+
+```css
+
+css
+/* Mobile First Approach */
+@media (min-width: 640px)  {/* sm */ }
+@media (min-width: 768px)  {/* md */ }
+@media (min-width: 1024px) {/* lg */ }
+@media (min-width: 1280px) {/* xl */ }
+
+```
+
+### Layout Adaptations
+
+- **Mobile (< 768px)**: Collapse sidebar navigation to overlay drawer
+- **Tablet (768px - 1024px)**: Maintain three-column layout with adjusted proportions
+- **Desktop (> 1024px)**: Full three-column layout as shown in prototypes
+
+### Component Responsiveness
+
+- **Typography**: Reduce scale by 10-15% on mobile devices
+- **Spacing**: Reduce padding/margins by 25% on smaller screens
+- **Touch Targets**: Minimum 44px × 44px for interactive elements
+
+---
+
+## 9. Accessibility Standards
+
+### Color Accessibility
+
+- **Minimum Contrast**: 4.5:1 for normal text, 3:1 for large text
+- **Color Independence**: Never rely solely on color to convey information
+- **High Contrast Mode**: Support system-level contrast preferences
+
+### Keyboard Navigation
+
+- **Tab Order**: Logical left-to-right, top-to-bottom progression
+- **Focus Management**: Trap focus in modals, return focus after closing
+- **Keyboard Shortcuts**: Support standard shortcuts (Ctrl+Enter for send, etc.)
+
+### Screen Reader Support
+
+- **Semantic HTML**: Use proper heading hierarchy and landmark elements
+- **ARIA Labels**: Provide context for interactive elements
+- **Live Regions**: Announce dynamic content changes (new messages, etc.)
+
+---
+
+## 10. Motion & Animation Guidelines
+
+### Animation Principles
+
+- **Purposeful Motion**: Animations should guide attention and provide feedback
+- **Performance First**: Use transform and opacity for optimal performance
+- **Respectful of Preferences**: Honor `prefers-reduced-motion` settings
+
+### Standard Animations
+
+```css
+
+css
+/* Modal Entry */
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Slide Transitions */
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+/* Subtle Hover Lift */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+```
+
+---
+
+## 11. Content Guidelines
+
+### Voice & Tone
+
+- **Professional yet Approachable**: Warm but authoritative
+- **Clear and Concise**: Avoid jargon, use active voice
+- **Helpful**: Provide context and next steps in error messages
+
+### Microcopy Standards
+
+```
+
+/* Button Labels */
+Primary Actions: "Send Message", "Create Class", "Add Student"
+Secondary Actions: "Cancel", "Edit", "View Details"
+
+/* Empty States */
+"No messages yet" + helpful guidance
+"No classes created" + clear call-to-action
+
+/* Error Messages */
+Clear explanation + specific resolution steps
+
+```
+
+### Placeholder Text
+
+- **Contextual**: "Message #class-name" vs generic "Type message"
+- **Helpful**: Include format hints where appropriate
+- **Consistent**: Use same patterns across similar inputs
+
+---
+
+## 12. Implementation Guidelines
+
+### CSS Architecture
+
+- **Utility-First Approach**: Built on Tailwind CSS foundation
+- **Component Classes**: Custom classes for repeated patterns
+- **CSS Custom Properties**: Use for theme values and runtime customization
+
+### Component Development Standards
+
+- **Modular Design**: Each component should be self-contained
+- **Props API**: Consistent prop naming across similar components
+- **Performance**: Optimize for re-renders and memory usage
+
+### Testing Standards
+
+- **Visual Regression**: Test component appearance across viewports
+- **Accessibility**: Automated testing with axe-core
+- **User Testing**: Regular validation with target user groups (teachers, students)
+
+---
+
+## 13. Quality Assurance
+
+### Design Review Checklist
+
+- [ ]  Consistent spacing using 4px grid system
+- [ ]  Proper color contrast ratios
+- [ ]  Responsive behavior across breakpoints
+- [ ]  Keyboard navigation support
+- [ ]  Loading and error states defined
+- [ ]  Content guidelines followed
+
+### Component Acceptance Criteria
+
+- [ ]  Visual design matches specification
+- [ ]  Interactive states implemented
+- [ ]  Accessibility requirements met
+- [ ]  Cross-browser compatibility verified
+- [ ]  Performance benchmarks met
+
+---
+
+## 14. Tools & Resources
+
+### Design Tools
+
+- **Tailwind CSS**: Utility-first CSS framework
+- **Lucide Icons**: Consistent icon system
+
+### Development Tools
+
+- **React**: Component framework
+- **Firebase**: Backend services

@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter - Classes (Empty)</title>
+    <!-- Base styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Icons - Updated Lucide implementation -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .screen-container {
+            width: 1200px;
+            height: 800px;
+            overflow: hidden;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        .calendar-day {
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        .calendar-day.selected {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .calendar-day.highlighted {
+            background-color: #dbeafe;
+        }
+    </style>
+    <style>
+        /* Modal styles */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(30, 27, 75, 0.5);
+            z-index: 50;
+            backdrop-filter: blur(4px);
+        }
+        
+        .weekday-picker {
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            max-width: 400px;
+        }
+        
+        .weekday-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 2px solid #e5e7eb;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .weekday-circle:hover {
+            border-color: #818cf8;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        
+        .weekday-circle.selected {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+
+        /* Form styles */
+        .form-input, .form-select {
+            width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            padding: 0.625rem 0.75rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #374151;
+            background-color: white;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            ring: 2px;
+            ring-color: #818cf8;
+            border-color: #6366f1;
+        }
+
+        .form-radio {
+            width: 1rem;
+            height: 1rem;
+            color: #4f46e5;
+            border-color: #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .form-radio:checked {
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+        }
+
+        /* Custom modal animation */
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-content {
+            animation: modalFadeIn 0.2s ease-out;
+        }
+
+        /* Teacher multi-select styles */
+        .teacher-select-container {
+            position: relative;
+        }
+
+        .teacher-input-container {
+            min-height: 42px;
+            padding: 2px;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            cursor: text;
+            background-color: white;
+            transition: all 0.2s;
+        }
+
+        .teacher-input-container:focus-within {
+            border-color: #6366f1;
+            ring: 2px;
+            ring-color: #818cf8;
+        }
+
+        .teacher-tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #eef2ff;
+            border-radius: 0.375rem;
+            padding: 2px 8px;
+            margin: 2px;
+            font-size: 0.875rem;
+            color: #4f46e5;
+            gap: 4px;
+        }
+
+        .teacher-tag button {
+            color: #6366f1;
+            padding: 1px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.25rem;
+        }
+
+        .teacher-tag button:hover {
+            background-color: #e0e7ff;
+        }
+
+        .teacher-input {
+            border: none;
+            outline: none;
+            padding: 4px 8px;
+            font-size: 0.875rem;
+            min-width: 120px;
+            flex-grow: 1;
+        }
+
+        .teacher-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background-color: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 50;
+            max-height: 250px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .teacher-dropdown.active {
+            display: block;
+        }
+
+        .teacher-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .teacher-option:hover {
+            background-color: #f3f4f6;
+        }
+
+        .teacher-option.selected {
+            background-color: #eef2ff;
+            color: #4f46e5;
+        }
+
+        .teacher-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #e0e7ff;
+            color: #4f46e5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .add-new-teacher {
+            padding: 8px 12px;
+            border-top: 1px solid #e5e7eb;
+            color: #4f46e5;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .add-new-teacher:hover {
+            background-color: #eef2ff;
+        }
+
+        /* Custom select styles */
+        .custom-select-container {
+            position: relative;
+        }
+
+        .custom-select-trigger {
+            min-height: 42px;
+            padding: 8px 12px;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            background-color: white;
+            transition: all 0.2s;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .custom-select-trigger.placeholder {
+            color: #9CA3AF;
+        }
+
+        .custom-select-trigger:hover {
+            border-color: #818cf8;
+        }
+
+        .custom-select-trigger:focus-within {
+            border-color: #6366f1;
+            ring: 2px;
+            ring-color: #818cf8;
+        }
+
+        .custom-select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background-color: white;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 50;
+            max-height: 250px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .custom-select-dropdown.active {
+            display: block;
+            animation: modalFadeIn 0.2s ease-out;
+        }
+
+        .custom-select-option {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .custom-select-option:hover {
+            background-color: #f3f4f6;
+        }
+
+        .custom-select-option.selected {
+            background-color: #eef2ff;
+            color: #4f46e5;
+        }
+
+        .custom-select-option.add-new {
+            border-top: 1px solid #e5e7eb;
+            color: #4f46e5;
+            font-weight: 500;
+        }
+
+        .custom-select-option.add-new:hover {
+            background-color: #eef2ff;
+        }
+
+        /* Toggle switch styles */
+        .toggle-switch-container {
+            display: inline-flex;
+            align-items: center;
+            background-color: #f3f4f6;
+            padding: 4px;
+            border-radius: 9999px;
+            position: relative;
+            width: fit-content;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 160px;
+            height: 32px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: transparent;
+            transition: 0.2s;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+        }
+
+        .toggle-handle {
+            position: absolute;
+            content: "";
+            height: 28px;
+            width: 80px;
+            background-color: white;
+            transition: 0.2s;
+            border-radius: 9999px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        .toggle-switch input:checked ~ .toggle-handle {
+            transform: translateX(76px);
+        }
+
+        .toggle-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            user-select: none;
+            z-index: 2;
+            position: absolute;
+            width: 80px;
+            text-align: center;
+            transition: color 0.2s;
+        }
+
+        .toggle-label.online {
+            left: 4px;
+        }
+
+        .toggle-label.offline {
+            right: 4px;
+        }
+
+        .toggle-switch input:checked ~ .toggle-label.online,
+        .toggle-switch input:not(:checked) ~ .toggle-label.offline {
+            color: #374151;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-6 gap-10">
+    <h1 class="text-3xl font-bold text-gray-800">Chat Interface - Empty State</h1>
+    
+    <div class="screen-container bg-white flex">
+        <!-- Left Sidebar - Navigation -->
+        <div class="w-16 bg-indigo-900 flex flex-col items-center py-4">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-6">
+                <i data-lucide="message-square" class="text-indigo-600"></i>
+            </div>
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <button class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="message-square"></i>
+                </button>
+                <button class="w-10 h-10 rounded-lg flex items-center justify-center text-white bg-indigo-700">
+                    <i data-lucide="users"></i>
+                </button>
+                <button class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="dollar-sign"></i>
+                </button>
+            </div>
+            <div class="mt-auto flex flex-col items-center gap-4">
+                <button class="w-10 h-10 rounded-lg flex items-center justify-center text-indigo-300 hover:bg-indigo-800 transition">
+                    <i data-lucide="settings"></i>
+                </button>
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-medium">BN</div>
+            </div>
+        </div>
+        
+        <!-- Channel Sidebar -->
+        <div class="w-64 bg-indigo-800 text-white flex flex-col">
+            <div class="p-4 border-b border-indigo-700">
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold">Channels</h2>
+                    <button class="text-indigo-300 hover:text-white">
+                        <i data-lucide="plus" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-3">
+                <div class="bg-indigo-700 rounded-md flex items-center p-2">
+                    <i data-lucide="search" class="h-4 w-4 text-indigo-300 mr-2"></i>
+                    <input type="text" placeholder="Search channels" class="bg-transparent border-none text-sm text-white placeholder-indigo-300 focus:outline-none w-full" />
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto">
+                <div class="px-3 py-2">
+                    <div class="space-y-1">
+                        <button class="flex items-center py-1 px-2 rounded bg-indigo-600 text-white w-full">
+                            <span class="text-sm"># A1.1 Morning Class</span>
+                        </button>
+                        <button class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200 w-full">
+                            <span class="text-sm"># B2.2 Evening Class</span>
+                        </button>
+                        <button class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 text-indigo-200 w-full">
+                            <span class="text-sm"># Teacher's Lounge</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="px-3 py-2 mt-4">
+                    <div class="flex items-center justify-between text-xs text-indigo-300 mb-2">
+                        <span class="font-semibold">DIRECT MESSAGES</span>
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <button class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 w-full">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Sarah Johnson</span>
+                        </button>
+                        <button class="flex items-center py-1 px-2 rounded hover:bg-indigo-700 w-full">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                            <span class="text-sm text-indigo-200">Alex Chen</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Area -->
+        <div class="flex-1 flex flex-col bg-white">
+            <!-- Chat Header -->
+            <div class="h-14 border-b border-gray-200 px-4 flex items-center justify-between">
+                <div class="flex items-center">
+                    <h3 class="font-semibold text-gray-800">#G38</h3>
+                    <span class="ml-2 text-sm text-gray-500">0 students</span>
+                </div>
+                
+                <!-- Tab Navigation -->
+                <div class="flex items-center space-x-1">
+                    <a href="chat-messages-empty.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Messages</a>
+                    <button class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">Classes</button>
+                    <a href="chat-tasks-empty.html" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Tasks</a>
+                    <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Wiki</button>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="text-gray-500 hover:text-gray-700">
+                        <i data-lucide="more-horizontal" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Classes Sub-tabs -->
+            <div class="border-b border-gray-200 px-4">
+                <div class="flex items-center space-x-1">
+                    <button id="courses-tab" onclick="showTab('courses')" class="px-4 py-2 text-sm font-medium text-indigo-600 border-b-2 border-indigo-600">Courses</button>
+                    <button id="info-tab" onclick="showTab('info')" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Info</button>
+                </div>
+            </div>
+            
+            <!-- Courses Screen -->
+            <div id="courses-screen" class="flex-1 overflow-y-auto">
+                <!-- Empty State for Classes -->
+                <div class="flex flex-col items-center justify-center h-full p-8 text-center">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <i data-lucide="users" class="h-8 w-8 text-gray-400"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Classes Created</h3>
+                    <p class="text-gray-500 mb-4 max-w-md">Start by creating your first class. You can add students, schedule sessions, and manage course materials.</p>
+                    <button class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+                        Create New Class
+                    </button>
+                </div>
+            </div>
+
+            <!-- Info Screen (Initially Hidden) -->
+            <div id="info-screen" class="flex-1 flex flex-col hidden">
+                <!-- Empty State for Class Info -->
+                <div class="flex flex-col items-center justify-center h-full p-8 text-center">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <i data-lucide="info" class="h-8 w-8 text-gray-400"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Class Information</h3>
+                    <p class="text-gray-500 mb-4 max-w-md">Create a class first to add information about schedule, teachers, and students.</p>
+                    <button class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                        <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+                        Create New Class
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create Class Modal -->
+    <div id="createClassModal" class="modal-backdrop">
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+            <div class="modal-content bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-semibold text-gray-900">Create New Class</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-500 p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                            <i data-lucide="x" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <form id="createClassForm" class="space-y-6">
+                        <!-- Name and Level in one row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Name -->
+                            <div class="space-y-1">
+                                <label class="block text-sm font-medium text-gray-700">Class Name</label>
+                                <input type="text" name="className" required class="form-input" placeholder="Enter class name">
+                            </div>
+                            
+                            <!-- Level -->
+                            <div class="space-y-1">
+                                <label class="block text-sm font-medium text-gray-700">Level</label>
+                                <div class="custom-select-container" id="levelSelect">
+                                    <div class="custom-select-trigger placeholder">
+                                        <span class="selected-text">Select level</span>
+                                        <i data-lucide="chevron-down" class="h-5 w-5 text-gray-400"></i>
+                                    </div>
+                                    <div class="custom-select-dropdown">
+                                        <div class="custom-select-option" data-value="A1.1">A1.1</div>
+                                        <div class="custom-select-option" data-value="A1.2">A1.2</div>
+                                        <div class="custom-select-option" data-value="A2.1">A2.1</div>
+                                        <div class="custom-select-option" data-value="A2.2">A2.2</div>
+                                        <div class="custom-select-option" data-value="B1.1">B1.1</div>
+                                        <div class="custom-select-option" data-value="B1.2">B1.2</div>
+                                        <div class="custom-select-option add-new" data-value="new">
+                                            <i data-lucide="plus-circle" class="h-5 w-5"></i>
+                                            <span>New Level...</span>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="level" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Class Format -->
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">Format</label>
+                            <div class="toggle-switch-container">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" name="format" value="offline" id="formatToggle" checked>
+                                    <span class="toggle-label online">Online</span>
+                                    <span class="toggle-label offline">Offline</span>
+                                    <span class="toggle-handle"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Class Type -->
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700">Type</label>
+                            <div class="custom-select-container" id="typeSelect">
+                                <div class="custom-select-trigger placeholder">
+                                    <span class="selected-text">Select type</span>
+                                    <i data-lucide="chevron-down" class="h-5 w-5 text-gray-400"></i>
+                                </div>
+                                <div class="custom-select-dropdown">
+                                    <div class="custom-select-option" data-value="G">G</div>
+                                    <div class="custom-select-option" data-value="P">P</div>
+                                    <div class="custom-select-option" data-value="A">A</div>
+                                    <div class="custom-select-option" data-value="M">M</div>
+                                    <div class="custom-select-option add-new" data-value="new">
+                                        <i data-lucide="plus-circle" class="h-5 w-5"></i>
+                                        <span>New Type...</span>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="type" required>
+                            </div>
+                        </div>
+
+                        <!-- Teachers -->
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700">Teachers</label>
+                            <div class="teacher-select-container">
+                                <div class="teacher-input-container" id="teacherContainer">
+                                    <input type="text" class="teacher-input" id="teacherInput" placeholder="Search teachers...">
+                                </div>
+                                <div class="teacher-dropdown" id="teacherDropdown">
+                                    <!-- Dropdown content will be populated by JavaScript -->
+                                </div>
+                                <input type="hidden" name="selectedTeachers" id="selectedTeachers">
+                            </div>
+                        </div>
+                        
+                        <!-- Dates -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="block text-sm font-medium text-gray-700">Begin Date</label>
+                                <input type="date" name="beginDate" required class="form-input">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                <input type="date" name="endDate" required class="form-input">
+                            </div>
+                        </div>
+                        
+                        <!-- Weekday Picker -->
+                        <div class="space-y-3">
+                            <label class="block text-sm font-medium text-gray-700">Class Days</label>
+                            <div class="weekday-picker">
+                                <div class="weekday-circle" data-day="1">M</div>
+                                <div class="weekday-circle" data-day="2">T</div>
+                                <div class="weekday-circle" data-day="3">W</div>
+                                <div class="weekday-circle" data-day="4">T</div>
+                                <div class="weekday-circle" data-day="5">F</div>
+                                <div class="weekday-circle" data-day="6">S</div>
+                                <div class="weekday-circle" data-day="0">S</div>
+                            </div>
+                            <input type="hidden" name="selectedDays" id="selectedDays">
+                        </div>
+                        
+                        <!-- Google Sheets URL -->
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700">Google Sheets URL</label>
+                            <input type="url" name="sheetsUrl" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/...">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeModal()" 
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit" form="createClassForm"
+                            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                            Create Class
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons({
+            attrs: {
+                class: ["lucide"],
+                strokeWidth: "2",
+            }
+        });
+
+        // Tab switching functionality
+        function showTab(tabName) {
+            // Hide all screens
+            document.getElementById('courses-screen').classList.add('hidden');
+            document.getElementById('info-screen').classList.add('hidden');
+            
+            // Show selected screen
+            document.getElementById(tabName + '-screen').classList.remove('hidden');
+            
+            // Update tab styles
+            document.getElementById('courses-tab').classList.remove('text-indigo-600', 'border-indigo-600');
+            document.getElementById('info-tab').classList.remove('text-indigo-600', 'border-indigo-600');
+            document.getElementById('courses-tab').classList.add('text-gray-500');
+            document.getElementById('info-tab').classList.add('text-gray-500');
+            
+            document.getElementById(tabName + '-tab').classList.remove('text-gray-500');
+            document.getElementById(tabName + '-tab').classList.add('text-indigo-600', 'border-indigo-600');
+        }
+    </script>
+    <script>
+        // Modal functionality
+        function openModal() {
+            document.getElementById('createClassModal').style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeModal() {
+            document.getElementById('createClassModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        
+        // Update all "Create New Class" buttons to open the modal
+        document.querySelectorAll('button').forEach(button => {
+            if (button.textContent.includes('Create New Class')) {
+                button.onclick = openModal;
+            }
+        });
+        
+        // Weekday picker functionality
+        document.querySelectorAll('.weekday-circle').forEach(circle => {
+            circle.addEventListener('click', function() {
+                this.classList.toggle('selected');
+                updateSelectedDays();
+            });
+        });
+        
+        function updateSelectedDays() {
+            const selectedDays = Array.from(document.querySelectorAll('.weekday-circle.selected'))
+                .map(circle => circle.dataset.day);
+            document.getElementById('selectedDays').value = selectedDays.join(',');
+        }
+        
+        // Form submission
+        document.getElementById('createClassForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData.entries());
+            console.log('Form data:', data);
+            // Here you would typically send the data to your backend
+            closeModal();
+        });
+        
+        // Close modal when clicking outside
+        document.getElementById('createClassModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Teacher selection functionality
+        const teachers = [
+            { id: 1, name: 'Sarah Johnson', email: 'sarah.j@example.com', initials: 'SJ' },
+            { id: 2, name: 'Michael Chen', email: 'michael.c@example.com', initials: 'MC' },
+            { id: 3, name: 'Emma Wilson', email: 'emma.w@example.com', initials: 'EW' },
+            { id: 4, name: 'David Kim', email: 'david.k@example.com', initials: 'DK' },
+            { id: 5, name: 'Maria Garcia', email: 'maria.g@example.com', initials: 'MG' },
+            { id: 6, name: 'James Smith', email: 'james.s@example.com', initials: 'JS' }
+        ];
+
+        let selectedTeacherIds = new Set();
+        const teacherContainer = document.getElementById('teacherContainer');
+        const teacherInput = document.getElementById('teacherInput');
+        const teacherDropdown = document.getElementById('teacherDropdown');
+        const selectedTeachersInput = document.getElementById('selectedTeachers');
+
+        function updateTeacherDropdown(searchTerm = '') {
+            const filteredTeachers = teachers.filter(teacher => 
+                teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                !selectedTeacherIds.has(teacher.id)
+            );
+
+            teacherDropdown.innerHTML = filteredTeachers.map(teacher => `
+                <div class="teacher-option" data-id="${teacher.id}">
+                    <div class="teacher-avatar">${teacher.initials}</div>
+                    <div>
+                        <div class="font-medium">${teacher.name}</div>
+                        <div class="text-sm text-gray-500">${teacher.email}</div>
+                    </div>
+                </div>
+            `).join('') + `
+                <div class="add-new-teacher">
+                    <i data-lucide="plus-circle" class="h-5 w-5"></i>
+                    <span>Add New Teacher</span>
+                </div>
+            `;
+
+            // Re-initialize Lucide icons for the new content
+            lucide.createIcons({
+                attrs: {
+                    class: ["lucide"],
+                    strokeWidth: "2",
+                }
+            });
+        }
+
+        function addTeacherTag(teacher) {
+            const tag = document.createElement('div');
+            tag.className = 'teacher-tag';
+            tag.innerHTML = `
+                ${teacher.name}
+                <button type="button" data-id="${teacher.id}">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </button>
+            `;
+            
+            teacherContainer.insertBefore(tag, teacherInput);
+            selectedTeacherIds.add(teacher.id);
+            updateSelectedTeachersInput();
+            
+            // Re-initialize Lucide icons for the new content
+            lucide.createIcons({
+                attrs: {
+                    class: ["lucide"],
+                    strokeWidth: "2",
+                }
+            });
+        }
+
+        function updateSelectedTeachersInput() {
+            selectedTeachersInput.value = Array.from(selectedTeacherIds).join(',');
+        }
+
+        // Event Listeners
+        teacherInput.addEventListener('focus', () => {
+            updateTeacherDropdown(teacherInput.value);
+            teacherDropdown.classList.add('active');
+        });
+
+        teacherInput.addEventListener('input', () => {
+            updateTeacherDropdown(teacherInput.value);
+            teacherDropdown.classList.add('active');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!teacherContainer.contains(e.target)) {
+                teacherDropdown.classList.remove('active');
+            }
+        });
+
+        teacherDropdown.addEventListener('click', (e) => {
+            const option = e.target.closest('.teacher-option');
+            if (option) {
+                const teacherId = parseInt(option.dataset.id);
+                const teacher = teachers.find(t => t.id === teacherId);
+                if (teacher) {
+                    addTeacherTag(teacher);
+                    teacherInput.value = '';
+                    updateTeacherDropdown();
+                }
+            }
+
+            const addNew = e.target.closest('.add-new-teacher');
+            if (addNew) {
+                // Here you would typically open a modal to add a new teacher
+                alert('Add New Teacher functionality would open a modal to create a new teacher');
+            }
+        });
+
+        teacherContainer.addEventListener('click', (e) => {
+            const removeButton = e.target.closest('.teacher-tag button');
+            if (removeButton) {
+                const teacherId = parseInt(removeButton.dataset.id);
+                selectedTeacherIds.delete(teacherId);
+                removeButton.closest('.teacher-tag').remove();
+                updateTeacherDropdown(teacherInput.value);
+                updateSelectedTeachersInput();
+            }
+        });
+
+        // Initialize the dropdown
+        updateTeacherDropdown();
+
+        // Custom Select Functionality
+        function initializeCustomSelect(containerId) {
+            const container = document.getElementById(containerId);
+            const trigger = container.querySelector('.custom-select-trigger');
+            const dropdown = container.querySelector('.custom-select-dropdown');
+            const hiddenInput = container.querySelector('input[type="hidden"]');
+            const selectedText = trigger.querySelector('.selected-text');
+
+            function closeAllDropdowns() {
+                document.querySelectorAll('.custom-select-dropdown').forEach(d => {
+                    d.classList.remove('active');
+                });
+            }
+
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isActive = dropdown.classList.contains('active');
+                closeAllDropdowns();
+                if (!isActive) {
+                    dropdown.classList.add('active');
+                }
+            });
+
+            dropdown.addEventListener('click', (e) => {
+                const option = e.target.closest('.custom-select-option');
+                if (option) {
+                    const value = option.dataset.value;
+                    if (value === 'new') {
+                        alert('Add New Option functionality would open a modal');
+                        return;
+                    }
+                    
+                    hiddenInput.value = value;
+                    selectedText.textContent = option.textContent;
+                    trigger.classList.remove('placeholder');
+                    
+                    // Update selected state
+                    dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
+                        opt.classList.toggle('selected', opt === option);
+                    });
+                    
+                    dropdown.classList.remove('active');
+                }
+            });
+        }
+
+        // Initialize custom selects
+        initializeCustomSelect('levelSelect');
+        initializeCustomSelect('typeSelect');
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.custom-select-dropdown').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
+        });
+    </script>
+</body>
+</html> 

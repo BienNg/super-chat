@@ -1,0 +1,97 @@
+/* Animations for checklist items */
+
+@keyframes fadeInBackground {
+  0% { background-color: rgba(99, 102, 241, 0); }
+  30% { background-color: rgba(99, 102, 241, 0.08); }
+  100% { background-color: rgba(99, 102, 241, 0); }
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes floatDown {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+
+/* Original animations with background color flash */
+.passive-move-animation {
+  animation: fadeInBackground 0.5s ease-out;
+}
+
+.passive-move-animation.moved-up {
+  animation: floatUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), fadeInBackground 0.5s ease-out;
+}
+
+.passive-move-animation.moved-down {
+  animation: floatDown 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), fadeInBackground 0.5s ease-out;
+}
+
+/* New animations without background color flash */
+.passive-move-animation.moved-up-no-flash {
+  animation: floatUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.passive-move-animation.moved-down-no-flash {
+  animation: floatDown 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Hover state for draggable items */
+.drag-handle {
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 20px;
+  background: rgba(99, 102, 241, 0.5);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.group:hover .drag-handle {
+  opacity: 1;
+}
+
+/* Override default drag cursor */
+.draggable-item {
+  cursor: pointer !important;
+}
+
+.draggable-item * {
+  cursor: pointer !important;
+}
+
+.draggable-item.dragging * {
+  cursor: pointer !important;
+}
+
+/* Glow effect for drop target */
+.drop-target {
+  animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Bounce animation for completing reordering */
+@keyframes completeBounce {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+  50% { transform: translateY(2px); }
+  70% { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+
+.reorder-complete {
+  animation: completeBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+} 

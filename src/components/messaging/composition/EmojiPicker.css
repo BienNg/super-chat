@@ -1,0 +1,151 @@
+/* EmojiPicker Component Styles */
+.emoji-picker {
+  width: 380px;
+  height: 400px;
+  position: relative;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Scrollbar styling for webkit browsers */
+.emoji-picker ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.emoji-picker ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.emoji-picker ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.emoji-picker ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Firefox scrollbar styling */
+.emoji-picker * {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Main content area that contains emoji grid */
+.emoji-picker-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.emoji-picker-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.emoji-picker-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.emoji-picker-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.emoji-picker-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Emoji grid container - no scrolling, let parent handle it */
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+/* Emoji button styling */
+.emoji-grid button {
+  min-height: 40px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.emoji-grid button:hover {
+  transform: scale(1.05);
+  background-color: #f3f4f6;
+}
+
+/* Header and category sections should not shrink */
+.emoji-picker > .border-b {
+  flex-shrink: 0;
+}
+
+/* General button hover effects (for non-emoji buttons) */
+.emoji-picker button:not(.emoji-grid button):hover {
+  background-color: #f3f4f6;
+}
+
+.emoji-picker button:active {
+  transform: scale(0.95);
+}
+
+/* Category buttons */
+.emoji-picker .category-button {
+  transition: all 0.2s ease;
+}
+
+.emoji-picker .category-button:hover {
+  background-color: #f3f4f6;
+}
+
+.emoji-picker .category-button.active {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+}
+
+/* Search input styling */
+.emoji-picker .search-input {
+  transition: all 0.2s ease;
+}
+
+.emoji-picker .search-input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .emoji-picker {
+    width: 340px;
+    height: 350px;
+  }
+}
+
+/* Animation for picker appearance */
+@keyframes emojiPickerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.emoji-picker {
+  animation: emojiPickerFadeIn 0.15s ease-out;
+}
+
+/* Remove old z-index and positioning styles that are now handled by the wrapper */ 
