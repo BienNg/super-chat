@@ -1,7 +1,6 @@
 import React from 'react';
 import { Mail, Phone, MapPin, Calendar, Tag, User, Globe, Monitor, FileText, Edit2, Check, X } from 'lucide-react';
-import FirebaseCollectionSelector from '../../shared/FirebaseCollectionSelector';
-import { FirebaseMultiSelectSelector } from '../../shared/index';
+import { SupabaseCollectionSelector, SupabaseMultiSelectSelector } from '../../shared/index';
 import { useFieldEdit } from '../../../hooks/useFieldEdit';
 
 const StudentInfoTab = ({ 
@@ -194,8 +193,8 @@ const StudentInfoTab = ({
         
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
           <SelectorField label="Country" icon={Globe}>
-            <FirebaseCollectionSelector
-              collectionName="countries"
+            <SupabaseCollectionSelector
+              tableName="countries"
               record={student}
               updateRecord={updateStudent}
               fieldName="location"
@@ -206,8 +205,8 @@ const StudentInfoTab = ({
           </SelectorField>
           
           <SelectorField label="City" icon={MapPin}>
-            <FirebaseCollectionSelector
-              collectionName="cities"
+            <SupabaseCollectionSelector
+              tableName="cities"
               record={student}
               updateRecord={updateStudent}
               fieldName="city"
@@ -218,8 +217,8 @@ const StudentInfoTab = ({
           </SelectorField>
           
           <SelectorField label="Platform" icon={Monitor}>
-            <FirebaseCollectionSelector
-              collectionName="platforms"
+            <SupabaseCollectionSelector
+              tableName="platforms"
               record={student}
               updateRecord={updateStudent}
               fieldName="platform"
@@ -230,8 +229,8 @@ const StudentInfoTab = ({
           </SelectorField>
           
           <SelectorField label="Categories" icon={Tag}>
-            <FirebaseMultiSelectSelector
-              collectionName="categories"
+            <SupabaseMultiSelectSelector
+              tableName="categories"
               record={student}
               updateRecord={updateStudent}
               fieldName="categories"

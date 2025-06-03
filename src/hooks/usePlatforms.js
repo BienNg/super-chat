@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../utils/supabaseClient';
 
 export function usePlatforms() {
   const [platforms, setPlatforms] = useState([]);
@@ -9,9 +8,15 @@ export function usePlatforms() {
   const fetchPlatforms = useCallback(async () => {
     try {
       setLoading(true);
-      const snapshot = await getDocs(collection(db, 'platforms'));
-      const platformsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPlatforms(platformsData);
+      const { data, error } = await supabase
+        .from('platforms')
+        .select('*');
+
+      if (error) {
+        throw error;
+      }
+
+      setPlatforms(data || []);
     } catch (error) {
       console.error('Error fetching platforms:', error);
     } finally {
@@ -34,10 +39,17 @@ export function usePlatforms() {
         throw new Error(`Platform "${trimmedPlatform}" already exists`);
       }
       
-      const docRef = await addDoc(collection(db, 'platforms'), { value: trimmedPlatform });
+      const { data, error } = await supabase
+        .from('platforms')
+        .insert([{ value: trimmedPlatform }])
+        .select();
+      
+      if (error) {
+        throw error;
+      }
       
       // Add to local state immediately
-      const newPlatform = { id: docRef.id, value: trimmedPlatform };
+      const newPlatform = data[0];
       setPlatforms(prev => [...prev, newPlatform]);
       
       return newPlatform;
@@ -49,7 +61,15 @@ export function usePlatforms() {
 
   const deletePlatform = async (id) => {
     try {
-      await deleteDoc(doc(db, 'platforms', id));
+      const { error } = await supabase
+        .from('platforms')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
       setPlatforms(prev => prev.filter(platform => platform.id !== id));
     } catch (error) {
       console.error('Error deleting platform:', error);

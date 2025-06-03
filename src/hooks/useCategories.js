@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../utils/supabaseClient';
 
 export function useCategories() {
   const [categories, setCategories] = useState([]);
@@ -9,9 +8,15 @@ export function useCategories() {
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const snapshot = await getDocs(collection(db, 'categories'));
-      const categoriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setCategories(categoriesData);
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*');
+
+      if (error) {
+        throw error;
+      }
+
+      setCategories(data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
     } finally {
@@ -34,10 +39,17 @@ export function useCategories() {
         throw new Error(`Category "${trimmedCategory}" already exists`);
       }
       
-      const docRef = await addDoc(collection(db, 'categories'), { value: trimmedCategory });
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([{ value: trimmedCategory }])
+        .select();
+      
+      if (error) {
+        throw error;
+      }
       
       // Add to local state immediately
-      const newCategory = { id: docRef.id, value: trimmedCategory };
+      const newCategory = data[0];
       setCategories(prev => [...prev, newCategory]);
       
       return newCategory;
@@ -47,9 +59,48 @@ export function useCategories() {
     }
   };
 
+  const updateCategory = async (id, newValue) => {
+    try {
+      const trimmedValue = newValue.trim();
+      const exists = categories.some(existingCategory => 
+        existingCategory.value.toLowerCase() === trimmedValue.toLowerCase() && 
+        existingCategory.id !== id
+      );
+      
+      if (exists) {
+        throw new Error(`Category "${trimmedValue}" already exists`);
+      }
+      
+      const { error } = await supabase
+        .from('categories')
+        .update({ value: trimmedValue })
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update in local state
+      setCategories(prev => prev.map(category => 
+        category.id === id ? { ...category, value: trimmedValue } : category
+      ));
+    } catch (error) {
+      console.error('Error updating category:', error);
+      throw error;
+    }
+  };
+
   const deleteCategory = async (id) => {
     try {
-      await deleteDoc(doc(db, 'categories', id));
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw error;
+      }
+      
       setCategories(prev => prev.filter(category => category.id !== id));
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -59,8 +110,10 @@ export function useCategories() {
 
   return { 
     categories: categories.map(category => category.value), 
+    categoriesWithIds: categories,
     loading, 
-    addCategory, 
+    addCategory,
+    updateCategory,
     deleteCategory 
   };
 } 
