@@ -105,12 +105,40 @@ export const AuthProvider = ({ children }) => {
         if (!userId) return null;
         
         try {
+            console.log("Updating user profile with data:", updates);
+            
+            // First check if we can get the current profile to see what fields exist
+            const { data: currentProfile, error: fetchError } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('user_id', userId)
+                .single();
+            
+            if (fetchError) {
+                console.error("Error fetching current profile:", fetchError);
+                // Continue anyway, we'll try the update
+            }
+            
+            // If we have the current profile, filter updates to include only existing fields
+            let safeUpdates = { ...updates };
+            if (currentProfile) {
+                const validFields = Object.keys(currentProfile);
+                safeUpdates = Object.keys(updates)
+                    .filter(key => validFields.includes(key))
+                    .reduce((obj, key) => {
+                        obj[key] = updates[key];
+                        return obj;
+                    }, {});
+                
+                // Always include updated_at
+                safeUpdates.updated_at = new Date().toISOString();
+                console.log("Filtered updates to include only valid fields:", safeUpdates);
+            }
+            
+            // Perform the update
             const { data, error } = await supabase
                 .from('user_profiles')
-                .update({
-                    ...updates,
-                    updated_at: new Date().toISOString()
-                })
+                .update(safeUpdates)
                 .eq('user_id', userId)
                 .select();
             
@@ -124,7 +152,32 @@ export const AuthProvider = ({ children }) => {
             return data[0];
         } catch (error) {
             console.error("Exception in updateUserProfile:", error);
-            return null;
+            
+            // Try one more time with minimal data if we had an error
+            try {
+                console.log("Retrying with minimal data...");
+                const minimalUpdate = {
+                    is_onboarding_complete: updates.is_onboarding_complete === true,
+                    updated_at: new Date().toISOString()
+                };
+                
+                const { data, error } = await supabase
+                    .from('user_profiles')
+                    .update(minimalUpdate)
+                    .eq('user_id', userId)
+                    .select();
+                
+                if (error) {
+                    console.error("Error in minimal update:", error);
+                    return null;
+                }
+                
+                setUserProfile(data[0]);
+                return data[0];
+            } catch (retryError) {
+                console.error("Exception in minimal update retry:", retryError);
+                return null;
+            }
         }
     };
 
@@ -148,8 +201,12 @@ export const AuthProvider = ({ children }) => {
                         setUserProfile(newProfile);
                     }
                     
-                    // Seed database with initial data if needed
-                    await seedDatabase();
+                    // Try to seed database, but don't block auth if it fails
+                    try {
+                        await seedDatabase();
+                    } catch (error) {
+                        console.error("Error seeding database but continuing:", error);
+                    }
                 } else {
                     console.log("No active session found");
                 }
@@ -180,6 +237,8 @@ export const AuthProvider = ({ children }) => {
                     }
                 } catch (error) {
                     console.error("Error handling auth state change:", error);
+                    // Set loading to false even if there's an error to prevent UI from getting stuck
+                    setLoading(false);
                 }
             } else {
                 setUserProfile(null);

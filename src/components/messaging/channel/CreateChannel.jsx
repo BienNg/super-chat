@@ -3,9 +3,13 @@ import React, { useState } from 'react';
 import { X, Hash, Lock } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import { supabase } from '../../../utils/supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useChannelClassSync } from '../../../hooks/useChannelClassSync';
 import { CHANNEL_TYPE_OPTIONS } from '../../../utils/channelTypes';
+
+// Flag to determine if we should use Supabase instead of Firebase
+const USE_SUPABASE = true;
 
 const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
     const [channelData, setChannelData] = useState({
@@ -23,10 +27,26 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
     // Function to check if channel name already exists
     const checkChannelNameExists = async (channelName) => {
         try {
-            const channelsRef = collection(db, 'channels');
-            const q = query(channelsRef, where('name', '==', channelName.trim()));
-            const snapshot = await getDocs(q);
-            return !snapshot.empty;
+            if (USE_SUPABASE) {
+                // Check in Supabase
+                const { data, error } = await supabase
+                    .from('channels')
+                    .select('id')
+                    .eq('name', channelName.trim());
+                
+                if (error) {
+                    console.error('Error checking channel name in Supabase:', error);
+                    throw new Error('Unable to verify channel name availability');
+                }
+                
+                return data.length > 0;
+            } else {
+                // Original Firebase implementation
+                const channelsRef = collection(db, 'channels');
+                const q = query(channelsRef, where('name', '==', channelName.trim()));
+                const snapshot = await getDocs(q);
+                return !snapshot.empty;
+            }
         } catch (error) {
             console.error('Error checking channel name:', error);
             throw new Error('Unable to verify channel name availability');
@@ -52,26 +72,67 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
                 return;
             }
 
-            const timestamp = serverTimestamp();
-            const channelRef = await addDoc(collection(db, 'channels'), {
-                name: channelData.name.trim(),
-                type: channelData.type,
-                members: [currentUser.uid], // Creator is automatically a member
-                admins: [currentUser.uid], // Creator is automatically an admin
-                createdBy: currentUser.uid,
-                createdAt: timestamp,
-                updatedAt: timestamp,
-                settings: {
-                    allowMemberInvites: false,
-                    isPrivate: channelData.isPrivate,
-                    notifications: true
+            // Get the user ID from either Supabase or Firebase auth
+            const userId = currentUser?.id || currentUser?.uid;
+            
+            if (!userId) {
+                throw new Error('User is not authenticated');
+            }
+
+            let channelId;
+            
+            if (USE_SUPABASE) {
+                // Create channel in Supabase
+                const timestamp = new Date().toISOString();
+                const { data, error } = await supabase
+                    .from('channels')
+                    .insert({
+                        name: channelData.name.trim(),
+                        type: channelData.type,
+                        members: [userId], 
+                        admins: [userId], 
+                        created_by: userId,
+                        created_at: timestamp,
+                        updated_at: timestamp,
+                        settings: {
+                            allowMemberInvites: false,
+                            isPrivate: channelData.isPrivate,
+                            notifications: true
+                        }
+                    })
+                    .select()
+                    .single();
+                
+                if (error) {
+                    throw error;
                 }
-            });
+                
+                channelId = data.id;
+            } else {
+                // Original Firebase implementation
+                const timestamp = serverTimestamp();
+                const channelRef = await addDoc(collection(db, 'channels'), {
+                    name: channelData.name.trim(),
+                    type: channelData.type,
+                    members: [userId], 
+                    admins: [userId],
+                    createdBy: userId,
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                    settings: {
+                        allowMemberInvites: false,
+                        isPrivate: channelData.isPrivate,
+                        notifications: true
+                    }
+                });
+                
+                channelId = channelRef.id;
+            }
 
             // If channel type is 'class', automatically create a class object
             if (channelData.type === 'class') {
                 try {
-                    await handleChannelTypeChange(channelRef.id, 'class', 'general', channelData.name.trim());
+                    await handleChannelTypeChange(channelId, 'class', 'general', channelData.name.trim());
                     console.log(`Auto-created class for new channel: ${channelData.name.trim()}`);
                 } catch (classError) {
                     console.error('Error creating class for new channel:', classError);
@@ -84,7 +145,7 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
 
             // Call the onChannelCreated callback with the new channel ID
             if (onChannelCreated) {
-                onChannelCreated(channelRef.id);
+                onChannelCreated(channelId);
             }
             
             // Reset form

@@ -1,6 +1,6 @@
 // src/App.js
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/SupabaseAuthContext';
 import { AdvancedFirebaseMonitorProvider } from './contexts/AdvancedFirebaseMonitorContext';
 import { ThreadProvider } from './contexts/ThreadContext';
@@ -11,6 +11,17 @@ import { BookkeepingInterface } from './components/bookkeeping';
 import AdminToggle from './components/shared/AdminToggle';
 import PermissionTestComponent from './components/shared/PermissionTestComponent';
 
+// Wrapper for OnboardingFlow with navigation
+const OnboardingFlowWithNavigation = () => {
+    const navigate = useNavigate();
+    
+    const handleOnboardingComplete = () => {
+        console.log("Onboarding complete, navigating to home");
+        navigate('/', { replace: true });
+    };
+    
+    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+};
 
 // Protected Route wrapper component
 const ProtectedRoute = ({ children }) => {
@@ -20,7 +31,7 @@ const ProtectedRoute = ({ children }) => {
         return <Navigate to="/login" replace />;
     }
 
-    if (userProfile && !userProfile.isOnboardingComplete) {
+    if (userProfile && !userProfile.is_onboarding_complete) {
         return <Navigate to="/onboarding" replace />;
     }
 
@@ -32,7 +43,7 @@ const PublicRoute = ({ children }) => {
     const { currentUser, userProfile } = useAuth();
     
     if (currentUser) {
-        if (userProfile && !userProfile.isOnboardingComplete) {
+        if (userProfile && !userProfile.is_onboarding_complete) {
             return <Navigate to="/onboarding" replace />;
         }
         return <Navigate to="/" replace />;
@@ -49,7 +60,7 @@ const OnboardingRoute = ({ children }) => {
         return <Navigate to="/login" replace />;
     }
 
-    if (userProfile && userProfile.isOnboardingComplete) {
+    if (userProfile && userProfile.is_onboarding_complete) {
         return <Navigate to="/" replace />;
     }
 
@@ -79,7 +90,7 @@ function App() {
                                 path="/onboarding" 
                                 element={
                                     <OnboardingRoute>
-                                        <OnboardingFlow />
+                                        <OnboardingFlowWithNavigation />
                                     </OnboardingRoute>
                                 } 
                             />

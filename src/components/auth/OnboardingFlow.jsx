@@ -1,9 +1,8 @@
 // src/components/OnboardingFlow.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Upload, User, Users, DollarSign, MessageSquare, Headphones, Camera, Plus } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { supabase } from '../../utils/supabaseClient';
 
 const OnboardingFlow = ({ onComplete }) => {
     const [currentScreen, setCurrentScreen] = useState(1);
@@ -16,8 +15,40 @@ const OnboardingFlow = ({ onComplete }) => {
         photo: null
     });
     const [loading, setLoading] = useState(false);
+    const [tableSchema, setTableSchema] = useState(null);
 
-    const { currentUser } = useAuth();
+    const { currentUser, updateUserProfile } = useAuth();
+
+    // Fetch table schema on component mount to diagnose issues
+    useEffect(() => {
+        const fetchSchema = async () => {
+            try {
+                // Get schema information for user_profiles table
+                const { data, error } = await supabase
+                    .from('user_profiles')
+                    .select('*')
+                    .limit(1);
+                
+                if (error) {
+                    console.error('Error fetching schema:', error);
+                    return;
+                }
+                
+                // Log the schema for debugging
+                if (data && data.length > 0) {
+                    const schemaColumns = Object.keys(data[0]);
+                    console.log('Available columns in user_profiles:', schemaColumns);
+                    setTableSchema(schemaColumns);
+                } else {
+                    console.log('No data found in user_profiles table');
+                }
+            } catch (error) {
+                console.error('Exception fetching schema:', error);
+            }
+        };
+        
+        fetchSchema();
+    }, []);
 
     const roles = [
         { id: 'teacher', name: 'Teacher', description: 'Manage classes and student progress', icon: Users },
@@ -44,6 +75,14 @@ const OnboardingFlow = ({ onComplete }) => {
     const handleCompleteSetup = async () => {
         try {
             setLoading(true);
+            console.log("Starting onboarding completion process");
+            
+            if (!currentUser) {
+                console.error("Error: currentUser is undefined in handleCompleteSetup");
+                throw new Error("User not authenticated");
+            }
+            
+            console.log("Current user:", currentUser.id);
             
             const finalRoles = selectedRoles.map((roleId) => {
                 if (roleId === 'custom') {
@@ -52,18 +91,41 @@ const OnboardingFlow = ({ onComplete }) => {
                 const role = roles.find((r) => r.id === roleId);
                 return { id: roleId, name: role?.name || roleId };
             });
+            
+            console.log("Prepared roles for update:", finalRoles);
 
-            const userRef = doc(db, 'users', currentUser.uid);
-            await updateDoc(userRef, {
+            // Create base update data
+            const baseUpdateData = {
                 roles: finalRoles,
-                fullName: profileData.fullName,
+                display_name: profileData.fullName,
                 department: profileData.department,
-                bio: profileData.bio,
-                photo: profileData.photo,
-                isOnboardingComplete: true,
-                updatedAt: new Date()
-            });
+                is_onboarding_complete: true
+            };
+            
+            // Only include fields that exist in the schema
+            const updateData = {};
+            
+            if (tableSchema) {
+                // Filter update data to only include fields that exist in the schema
+                Object.keys(baseUpdateData).forEach(key => {
+                    if (tableSchema.includes(key)) {
+                        updateData[key] = baseUpdateData[key];
+                    } else {
+                        console.log(`Skipping field ${key} as it doesn't exist in the schema`);
+                    }
+                });
+            } else {
+                // If we couldn't fetch the schema, use a minimal set of fields
+                updateData.display_name = profileData.fullName;
+                updateData.is_onboarding_complete = true;
+            }
+            
+            console.log("About to update profile with data:", updateData);
+            
+            const updatedProfile = await updateUserProfile(currentUser.id, updateData);
+            console.log("Profile update completed:", updatedProfile);
 
+            console.log("Onboarding completion successful, calling onComplete callback");
             onComplete?.();
         } catch (error) {
             console.error('Error completing onboarding:', error);

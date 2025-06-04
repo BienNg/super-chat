@@ -367,6 +367,7 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
                       onChange={(val) => handleInputChange('location', val)}
                       options={countries}
                       onAddNew={(val) => handleAddNewOption('countries', val)}
+                      allowAddNew={true}
                       hasError={!!errors.location}
                       placeholder="Select country"
                     />
@@ -385,6 +386,7 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
                       onChange={(val) => handleInputChange('city', val)}
                       options={cities}
                       onAddNew={(val) => handleAddNewOption('cities', val)}
+                      allowAddNew={true}
                       placeholder="Select city"
                     />
                   </div>
@@ -399,6 +401,7 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
                       onChange={(val) => handleInputChange('platform', val)}
                       options={platforms}
                       onAddNew={(val) => handleAddNewOption('platforms', val)}
+                      allowAddNew={true}
                       placeholder="Select platform"
                     />
                   </div>
