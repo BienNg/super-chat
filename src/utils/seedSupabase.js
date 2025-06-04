@@ -292,12 +292,7 @@ export const seedChannels = async () => {
         .from('channels')
         .insert({
           name: 'general',
-          type: 'general',
-          settings: {
-            allowMemberInvites: true,
-            isPrivate: false,
-            notifications: true
-          }
+          description: 'General discussion channel'
         });
 
       if (insertError) {

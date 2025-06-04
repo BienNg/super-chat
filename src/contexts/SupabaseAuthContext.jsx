@@ -47,9 +47,9 @@ export const AuthProvider = ({ children }) => {
         try {
             // Check if user profile exists
             const { data: existingProfiles, error: checkError } = await supabase
-                .from('user_profiles')
+                .from('profiles')
                 .select('*')
-                .eq('user_id', user.id)
+                .eq('id', user.id)
                 .single();
             
             if (checkError && checkError.code !== 'PGRST116') {
@@ -66,9 +66,9 @@ export const AuthProvider = ({ children }) => {
             // Create new profile if it doesn't exist
             console.log("Creating new profile for user:", user.id);
             const { data, error } = await supabase
-                .from('user_profiles')
+                .from('profiles')
                 .insert({
-                    user_id: user.id,
+                    id: user.id,
                     display_name: user.user_metadata?.full_name || user.email.split('@')[0],
                     email: user.email,
                     roles: [],
@@ -95,9 +95,9 @@ export const AuthProvider = ({ children }) => {
         
         try {
             const { data, error } = await supabase
-                .from('user_profiles')
+                .from('profiles')
                 .select('*')
-                .eq('user_id', userId)
+                .eq('id', userId)
                 .single();
             
             if (error && error.code !== 'PGRST116') {
@@ -121,9 +121,9 @@ export const AuthProvider = ({ children }) => {
             
             // First check if we can get the current profile to see what fields exist
             const { data: currentProfile, error: fetchError } = await supabase
-                .from('user_profiles')
+                .from('profiles')
                 .select('*')
-                .eq('user_id', userId)
+                .eq('id', userId)
                 .single();
             
             if (fetchError) {
@@ -149,9 +149,9 @@ export const AuthProvider = ({ children }) => {
             
             // Perform the update
             const { data, error } = await supabase
-                .from('user_profiles')
+                .from('profiles')
                 .update(safeUpdates)
-                .eq('user_id', userId)
+                .eq('id', userId)
                 .select();
             
             if (error) {
@@ -174,9 +174,9 @@ export const AuthProvider = ({ children }) => {
                 };
                 
                 const { data, error } = await supabase
-                    .from('user_profiles')
+                    .from('profiles')
                     .update(minimalUpdate)
-                    .eq('user_id', userId)
+                    .eq('id', userId)
                     .select();
                 
                 if (error) {

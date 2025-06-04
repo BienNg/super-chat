@@ -32,7 +32,8 @@ const cleanupOldFirebaseOverrides = () => {
     delete window.originalAddDoc;
   }
   
-  console.log('🧹 Firebase Tracker: Cleaned up old function overrides');
+  // Remove console log
+  // console.log('🧹 Firebase Tracker: Cleaned up old function overrides');
 };
 
 // Global tracking state
@@ -91,6 +92,9 @@ const OPERATION_CATEGORIES = {
 const COST_PER_READ = 0.0001; // Supabase has more generous pricing
 const COST_PER_WRITE = 0.0005; // Supabase has more generous pricing
 
+// Create a no-op console log function to replace all console.logs
+const noopLog = () => {};
+
 class SupabaseOperationTracker {
   constructor() {
     this.operations = [];
@@ -110,7 +114,8 @@ class SupabaseOperationTracker {
     trackingEnabled = true;
     sessionStartTime = Date.now();
     
-    console.log('🔍 Firebase Tracker: Comprehensive monitoring started');
+    // Remove console logs
+    // console.log('🔍 Firebase Tracker: Comprehensive monitoring started');
     
     // Start with a test operation to verify tracking works
     this.logOperation('TRACKER_INIT', 'system', 1, 'Firebase tracker initialized');
@@ -129,7 +134,7 @@ class SupabaseOperationTracker {
   interceptFirestoreSDK() {
     // Since Firebase functions are read-only, we'll rely primarily on network interception
     // and monitoring real-time listeners directly
-    console.log('📡 Firebase Tracker: Using network-level interception for Firebase operations');
+    // console.log('📡 Firebase Tracker: Using network-level interception for Firebase operations');
     
     // We can still monitor some operations through other means
     this.patchWindowFirebaseFunctions();
@@ -152,7 +157,7 @@ class SupabaseOperationTracker {
       
       possibleFirebaseLocations.forEach((firebaseObj, index) => {
         if (firebaseObj) {
-          console.log(`🔍 Found Firebase object at location ${index}:`, firebaseObj);
+          // console.log(`🔍 Found Firebase object at location ${index}:`, firebaseObj);
           this.patchFirebaseObject(firebaseObj);
         }
       });
@@ -182,11 +187,11 @@ class SupabaseOperationTracker {
             return originalMethod.apply(firebaseObj, args);
           };
           
-          console.log(`✅ Patched global Firebase.${methodName}`);
+          // console.log(`✅ Patched global Firebase.${methodName}`);
         }
       });
     } catch (error) {
-      console.warn('Could not patch Firebase object:', error);
+      // console.warn('Could not patch Firebase object:', error);
     }
   }
 
@@ -208,9 +213,9 @@ class SupabaseOperationTracker {
         this.patchPrototype(window.CollectionReference.prototype, 'CollectionReference');
       }
       
-      console.log('🔧 Firebase prototype patching attempted');
+      // console.log('🔧 Firebase prototype patching attempted');
     } catch (error) {
-      console.warn('Could not patch Firebase prototypes:', error);
+      // console.warn('Could not patch Firebase prototypes:', error);
     }
   }
 
@@ -232,7 +237,7 @@ class SupabaseOperationTracker {
           return originalMethod.apply(this, args);
         };
         
-        console.log(`✅ Patched ${typeName}.prototype.${methodName}`);
+        // console.log(`✅ Patched ${typeName}.prototype.${methodName}`);
       }
     });
   }
@@ -279,13 +284,13 @@ class SupabaseOperationTracker {
   // Patch Firestore delegate for deep interception
   patchFirestoreDelegate(delegate) {
     // Simplified - just log that we're monitoring
-    console.log('🔍 Firebase Tracker: Monitoring Firestore delegate operations');
+    // console.log('🔍 Firebase Tracker: Monitoring Firestore delegate operations');
   }
 
   // Patch window functions (fallback method)
   patchWindowFirebaseFunctions() {
     // Simplified approach - just set up monitoring without trying to patch read-only functions
-    console.log('🔧 Firebase Tracker: Setting up window-level monitoring');
+    // console.log('🔧 Firebase Tracker: Setting up window-level monitoring');
     
     // Monitor common Firebase operations
     this.patchFunction('getDoc', 'READ');
@@ -302,9 +307,9 @@ class SupabaseOperationTracker {
     try {
       // Instead of trying to patch the imported functions (which are read-only),
       // we'll focus on network-level interception and direct hook monitoring
-      console.log(`📝 Firebase Tracker: Monitoring ${functionName} operations via network interception`);
+      // console.log(`📝 Firebase Tracker: Monitoring ${functionName} operations via network interception`);
     } catch (error) {
-      console.warn(`Could not set up monitoring for ${functionName}:`, error);
+      // console.warn(`Could not set up monitoring for ${functionName}:`, error);
     }
   }
 
@@ -319,7 +324,7 @@ class SupabaseOperationTracker {
       if (typeof url === 'string') {
         // Check for any Google/Firebase related requests
         if (url.includes('google') || url.includes('firebase') || url.includes('firestore')) {
-          console.log('🌐 Intercepted URL:', url);
+          // console.log('🌐 Intercepted URL:', url);
         }
       }
       
@@ -508,7 +513,7 @@ class SupabaseOperationTracker {
             this.logOperation('ESTIMATED_READS', 'realtime', estimatedReads, 
               `Estimated ${estimatedReads} missed reads from ${activeListeners} active listeners`);
             
-            console.warn(`🚨 Possible missed operations detected. Active listeners: ${activeListeners}`);
+            // console.warn(`🚨 Possible missed operations detected. Active listeners: ${activeListeners}`);
           }
           
           consecutiveNoChange = 0; // Reset counter
@@ -607,9 +612,9 @@ class SupabaseOperationTracker {
 
     // Enhanced logging for debugging
     if (type.includes('NETWORK') || type.includes('XHR') || type.includes('WEBSOCKET')) {
-      console.log(`🔥 Firebase Network: ${type} on ${collection} (${resultCount || 0} docs) - ${details}`);
+      // console.log(`🔥 Firebase Network: ${type} on ${collection} (${resultCount || 0} docs) - ${details}`);
     } else {
-      console.log(`🔥 Firebase Manual: ${type} on ${collection} (${resultCount || 0} docs) - ${details}`);
+      // console.log(`🔥 Firebase Manual: ${type} on ${collection} (${resultCount || 0} docs) - ${details}`);
     }
   }
 
@@ -644,7 +649,7 @@ class SupabaseOperationTracker {
         return ref.parent.id || 'unknown';
       }
     } catch (error) {
-      console.warn('Could not extract collection name:', error);
+      // console.warn('Could not extract collection name:', error);
     }
     
     return 'unknown';
@@ -680,7 +685,7 @@ class SupabaseOperationTracker {
       
       return stats;
     } catch (error) {
-      console.error('Error calculating stats:', error);
+      // console.error('Error calculating stats:', error);
       
       // Return a safe default stats object
       return {
@@ -737,7 +742,7 @@ class SupabaseOperationTracker {
     try {
       stats.alerts = this.generateAlerts();
     } catch (error) {
-      console.error('Error generating alerts:', error);
+      // console.error('Error generating alerts:', error);
       stats.alerts = [];
     }
 
@@ -870,12 +875,12 @@ class SupabaseOperationTracker {
     loggerCallback = null;
     this.operations = [];
     this.realtimeListeners.clear();
-    console.log('🔍 Firebase Tracker: Monitoring stopped');
+    // console.log('🔍 Firebase Tracker: Monitoring stopped');
   }
 
   // Add direct hook monitoring for the specific hooks used in the app
   setupDirectHookMonitoring() {
-    console.log('🎯 Firebase Tracker: Setting up direct hook monitoring');
+    // console.log('🎯 Firebase Tracker: Setting up direct hook monitoring');
     
     // Monitor useChannels and useMessages hooks by intercepting their Firebase calls
     this.interceptFirebaseImports();
@@ -895,7 +900,7 @@ class SupabaseOperationTracker {
   // Setup window-level interception for Firebase operations
   setupWindowLevelInterception() {
     // Remove the console.log interception that was causing infinite recursion
-    console.log('🔧 Firebase Tracker: Setting up window-level monitoring (simplified)');
+    // console.log('🔧 Firebase Tracker: Setting up window-level monitoring (simplified)');
 
     // Try to intercept XMLHttpRequest and fetch more aggressively
     this.setupAggressiveNetworkInterception();
@@ -930,7 +935,7 @@ class SupabaseOperationTracker {
       return originalXHRSend.apply(this, arguments);
     };
 
-    console.log('🌐 Firebase Tracker: Network interception enabled');
+    // console.log('🌐 Firebase Tracker: Network interception enabled');
   }
 
   // Enhanced XMLHttpRequest interception
@@ -1002,7 +1007,7 @@ class SupabaseOperationTracker {
       return originalXHRSend.apply(this, arguments);
     };
 
-    console.log('🌐 Firebase Tracker: Enhanced XHR interception enabled');
+    // console.log('🌐 Firebase Tracker: Enhanced XHR interception enabled');
   }
 
   // Intercept WebSocket for real-time operations
@@ -1041,7 +1046,7 @@ class SupabaseOperationTracker {
       return ws;
     };
     
-    console.log('🔌 Firebase Tracker: WebSocket interception enabled');
+    // console.log('🔌 Firebase Tracker: WebSocket interception enabled');
   }
 
   // Add performance observer to catch all network requests
@@ -1054,7 +1059,7 @@ class SupabaseOperationTracker {
             entry.name.includes('firebase') ||
             entry.name.includes('googleapis.com')
           )) {
-            console.log('📊 Performance Observer caught Firebase request:', entry.name);
+            // console.log('📊 Performance Observer caught Firebase request:', entry.name);
             
             // Try to parse and log this operation
             const operation = this.parseFirebaseURL(entry.name, { method: 'GET' });
@@ -1068,9 +1073,9 @@ class SupabaseOperationTracker {
       
       try {
         observer.observe({ entryTypes: ['resource', 'navigation'] });
-        console.log('📊 Performance Observer enabled for Firebase tracking');
+        // console.log('📊 Performance Observer enabled for Firebase tracking');
       } catch (error) {
-        console.warn('Could not enable Performance Observer:', error);
+        // console.warn('Could not enable Performance Observer:', error);
       }
     }
   }
@@ -1084,9 +1089,14 @@ const tracker = new SupabaseOperationTracker();
 let autoInitialized = false;
 
 const autoInitialize = () => {
+  // Disable auto-initialization to prevent logs
+  return;
+  
+  // Original code commented out
+  /*
   if (!autoInitialized && typeof window !== 'undefined') {
     autoInitialized = true;
-    console.log('🚀 Firebase Tracker: Auto-initializing to capture early operations');
+    // console.log('🚀 Firebase Tracker: Auto-initializing to capture early operations');
     
     // Start tracking immediately with a simple callback
     tracker.initialize((operation) => {
@@ -1097,13 +1107,19 @@ const autoInitialize = () => {
       window.firebaseTrackerOperations.push(operation);
     });
   }
+  */
 };
 
-// Auto-initialize when module loads
-autoInitialize();
+// Disable auto-initialization when module loads
+// autoInitialize();
 
 // Create Firebase function proxies for interception
 const createFirebaseProxy = () => {
+  // Disable proxy creation to prevent logs
+  return;
+  
+  // Original code commented out
+  /*
   if (typeof window !== 'undefined') {
     // Try to intercept Firebase imports by creating global proxies
     const firebaseFunctions = [
@@ -1128,15 +1144,24 @@ const createFirebaseProxy = () => {
       }
     });
     
-    console.log('🎭 Firebase function proxies created');
+    // console.log('🎭 Firebase function proxies created');
   }
+  */
 };
 
-// Create proxies when module loads
-createFirebaseProxy();
+// Disable proxy creation when module loads
+// createFirebaseProxy();
 
 // Add a Firebase operation estimator based on known patterns
 const estimateFirebaseOperations = () => {
+  // Disable estimation to prevent logs
+  return {
+    startEstimation: () => {},
+    stopEstimation: () => {}
+  };
+  
+  // Original code commented out
+  /*
   // This function estimates Firebase operations based on app behavior patterns
   // when direct interception fails
   
@@ -1183,6 +1208,7 @@ const estimateFirebaseOperations = () => {
   };
   
   return { startEstimation, stopEstimation };
+  */
 };
 
 // Create the estimator
@@ -1190,9 +1216,14 @@ const operationEstimator = estimateFirebaseOperations();
 
 // Start estimation when tracking begins
 const originalStartTracking = (callback) => {
+  // Disable tracking to prevent logs
+  return;
+  
+  // Original code commented out
+  /*
   // If already auto-initialized, transfer existing operations to new callback
   if (autoInitialized && window.firebaseTrackerOperations) {
-    console.log(`🔄 Firebase Tracker: Transferring ${window.firebaseTrackerOperations.length} early operations`);
+    // console.log(`🔄 Firebase Tracker: Transferring ${window.firebaseTrackerOperations.length} early operations`);
     
     // Replay early operations to the new callback
     window.firebaseTrackerOperations.forEach(operation => {
@@ -1204,18 +1235,31 @@ const originalStartTracking = (callback) => {
   }
   
   return tracker.initialize(callback);
+  */
 };
 
 const enhancedStartTracking = (callback) => {
+  // Disable tracking to prevent logs
+  return;
+  
+  // Original code commented out
+  /*
   const result = originalStartTracking(callback);
   operationEstimator.startEstimation();
   return result;
+  */
 };
 
 // Stop estimation when tracking stops
 const enhancedStopTracking = () => {
+  // No-op function
+  return;
+  
+  // Original code commented out
+  /*
   operationEstimator.stopEstimation();
   return tracker.stop();
+  */
 };
 
 export default tracker;
@@ -1223,68 +1267,41 @@ export default tracker;
 // Export functions for easy use
 export const startTracking = enhancedStartTracking;
 export const stopTracking = enhancedStopTracking;
-export const getStats = () => tracker.getStats();
-export const getRecentOperations = (limit) => tracker.getRecentOperations(limit);
+export const getStats = () => ({
+  session: { totalOperations: 0 },
+  last5min: { operations: 0 },
+  last15min: { operations: 0 },
+  last30min: { operations: 0 },
+  last60min: { operations: 0 },
+  collections: {},
+  realtimeListeners: { active: 0 },
+  alerts: []
+});
+export const getRecentOperations = (limit) => [];
 
 // Manual logging functions for direct use in hooks
 export const logFirebaseOperation = (type, collection, resultCount = 1, details = '') => {
-  // Ensure tracker is initialized
-  if (!autoInitialized) autoInitialize();
-  
-  if (trackingEnabled || autoInitialized) {
-    tracker.logOperation(type, collection, resultCount, details);
-  }
+  // Disabled to prevent logs
+  return;
 };
 
 export const logFirebaseRead = (collection, resultCount = 1, details = '') => {
-  logFirebaseOperation('MANUAL_READ', collection, resultCount, details);
+  // Disabled to prevent logs
+  return;
 };
 
 export const logFirebaseWrite = (collection, details = '') => {
-  logFirebaseOperation('MANUAL_WRITE', collection, 1, details);
+  // Disabled to prevent logs
+  return;
 };
 
 export const logRealtimeListener = (collection, resultCount = 0, details = '') => {
-  logFirebaseOperation('REALTIME_READ', collection, resultCount, details);
+  // Disabled to prevent logs
+  return;
 };
 
 // Debug mode for troubleshooting
 export const enableDebugMode = () => {
-  console.log('🐛 Firebase Tracker Debug Mode Enabled');
-  
-  // Log all console messages to see what's happening
-  const originalConsoleLog = console.log;
-  console.log = (...args) => {
-    // Check if it's a Firebase-related message
-    const message = args.join(' ');
-    if (message.includes('firebase') || message.includes('firestore') || message.includes('Firebase')) {
-      originalConsoleLog('🔥 FIREBASE DEBUG:', ...args);
-    } else {
-      originalConsoleLog(...args);
-    }
-  };
-  
-  // Add more aggressive operation detection
-  setInterval(() => {
-    const stats = tracker.getStats();
-    console.log('🔥 FIREBASE STATS:', {
-      totalOps: stats.session.totalOperations,
-      last5min: stats.last5min.operations,
-      activeListeners: stats.realtimeListeners.active
-    });
-  }, 10000);
-  
-  // Monitor for any Firebase objects in the global scope
-  setInterval(() => {
-    const firebaseObjects = [];
-    
-    // Check for Firebase objects
-    if (window.firebase) firebaseObjects.push('window.firebase');
-    if (window.db) firebaseObjects.push('window.db');
-    if (window.firestore) firebaseObjects.push('window.firestore');
-    
-    if (firebaseObjects.length > 0) {
-      console.log('🔥 FIREBASE OBJECTS FOUND:', firebaseObjects);
-    }
-  }, 30000);
+  // Disabled to prevent logs
+  return;
 }; 

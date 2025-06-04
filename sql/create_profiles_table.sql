@@ -1,59 +1,3 @@
-# Super Chat Platform
-
-A real-time, role-based communication and productivity app designed for internal use within organizations. Built with React.js and Firebase, this platform centralizes team messaging, task management, file sharing, and collaborative documentation into one unified workspace.
-
-## UI Design Showcase
-
-This repository contains a UI design showcase with two main screens:
-1. Login screen
-2. Chat interface with channels
-
-## How to Run
-
-The design showcase is pure HTML/CSS with minimal JavaScript. To view the design:
-
-1. Open `index.html` in your browser
-2. The design is responsive but optimized for desktop viewing
-
-## Design Features
-
-The UI design follows these key principles:
-- Bold simplicity with intuitive navigation
-- Strategic whitespace and color accents for visual hierarchy
-- Typography hierarchy for information architecture
-- Accessibility-driven contrast ratios
-- Content-first layouts prioritizing user objectives
-
-## Technologies Used
-
-- HTML5
-- Tailwind CSS (via CDN)
-- Lucide Icons
-- Vanilla JavaScript
-
-## Future Implementation
-
-For actual implementation, this design would be integrated with:
-- React.js for component-based architecture
-- Firebase for real-time data synchronization
-- Authentication system for user management
-- File storage for document sharing
-
-## License
-
-This project is proprietary and for demonstration purposes only.
-
-## Database Setup Instructions
-
-To properly set up the database for this application:
-
-1. Log in to your Supabase dashboard: https://supabase.com/dashboard
-2. Select your project (with ID `wfulsrexakuiykbtjmid`)
-3. Navigate to the "SQL Editor" section in the left sidebar
-4. Create a new query
-5. Copy and paste the following SQL script:
-
-```sql
 -- Create the profiles table for user profiles
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -69,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- Enable Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Create policies for profiles
+-- Create policies for profiles using DO blocks to check existence first
 DO
 $$
 BEGIN
@@ -132,6 +76,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create a trigger to automatically create a profile when a new user is created
+-- First check if the trigger already exists to avoid the error
 DO
 $$
 BEGIN
@@ -144,19 +89,4 @@ BEGIN
       FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
   END IF;
 END
-$$;
-
--- Drop the user_profiles table if it exists
-DROP TABLE IF EXISTS public.user_profiles;
-```
-
-6. Click the "Run" button
-
-This script will:
-- Create the profiles table if it doesn't exist
-- Set up Row Level Security policies
-- Create appropriate indexes
-- Set up a trigger to automatically create profiles for new users
-- Remove the redundant user_profiles table
-
-After running this script, restart your application and everything should work properly.
+$$; 

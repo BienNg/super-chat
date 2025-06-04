@@ -61,13 +61,15 @@ export const AuthProvider = ({ children }) => {
         if (!userId) return null;
         try {
             const { data, error } = await supabase
-                .from('profiles') // Assuming a 'profiles' table linked to auth.users by id
+                .from('profiles')
                 .select('*')
                 .eq('id', userId)
                 .single();
+                
             if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found, which is acceptable
                 throw error;
             }
+            
             return data;
         } catch (error) {
             console.error("Error fetching user profile:", error);

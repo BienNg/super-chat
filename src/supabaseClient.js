@@ -8,4 +8,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase URL and anon key are required.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey); 
+// Create Supabase client with options
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    timeout: 30000, // Increase timeout for realtime connection (default is 10000)
+    params: {
+      eventsPerSecond: 10 // Reduce the events per second to avoid rate limiting
+    }
+  },
+  // Enable auto-refresh of auth tokens for longer sessions
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true
+  }
+}); 

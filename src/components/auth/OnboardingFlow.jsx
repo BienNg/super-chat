@@ -1,7 +1,7 @@
 // src/components/OnboardingFlow.jsx
 import React, { useState, useEffect } from 'react';
 import { Check, Upload, User, Users, DollarSign, MessageSquare, Headphones, Camera, Plus } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
 
 const OnboardingFlow = ({ onComplete }) => {
     const [currentScreen, setCurrentScreen] = useState(1);
@@ -15,7 +15,13 @@ const OnboardingFlow = ({ onComplete }) => {
     });
     const [loading, setLoading] = useState(false);
 
-    const { currentUser, updateUserProfile } = useAuth();
+    const { currentUser, userProfile, updateUserProfile } = useAuth();
+    
+    console.log("OnboardingFlow rendered with currentUser:", currentUser, "userProfile:", userProfile);
+    
+    useEffect(() => {
+        console.log("Auth state in OnboardingFlow changed - currentUser:", currentUser, "userProfile:", userProfile);
+    }, [currentUser, userProfile]);
 
     const roles = [
         { id: 'teacher', name: 'Teacher', description: 'Manage classes and student progress', icon: Users },
@@ -42,7 +48,7 @@ const OnboardingFlow = ({ onComplete }) => {
     const handleCompleteSetup = async () => {
         try {
             setLoading(true);
-            console.log("Starting onboarding completion process with Firebase Auth");
+            console.log("Starting onboarding completion process with Supabase Auth");
             
             if (!currentUser) {
                 console.error("Error: currentUser is undefined in handleCompleteSetup");
@@ -50,7 +56,7 @@ const OnboardingFlow = ({ onComplete }) => {
                 throw new Error("User not authenticated");
             }
             
-            console.log("Current user for Firestore update:", currentUser.uid);
+            console.log("Current user for Supabase update:", currentUser.id);
             
             // Determine primary role
             let primaryRole = '';
@@ -61,8 +67,9 @@ const OnboardingFlow = ({ onComplete }) => {
                 primaryRole = firstSelectedRole ? firstSelectedRole.name : selectedRoles[0];
             }
 
+            // Convert to snake_case for Supabase
             const updateData = {
-                displayName: profileData.fullName,
+                display_name: profileData.fullName,
                 role: primaryRole,
                 department: profileData.department,
                 bio: profileData.bio,
@@ -71,18 +78,19 @@ const OnboardingFlow = ({ onComplete }) => {
                     const roleObj = roles.find(r => r.id === roleId);
                     return roleObj ? roleObj.name : roleId;
                 }),
-                isOnboardingComplete: true,
+                is_onboarding_complete: true,
+                updated_at: new Date().toISOString()
             };
             
-            console.log("About to update Firestore profile with data:", updateData);
+            console.log("About to update Supabase profile with data:", updateData);
             
-            await updateUserProfile(currentUser.uid, updateData);
-            console.log("Firestore Profile update completed.");
+            const updatedProfile = await updateUserProfile(currentUser.id, updateData);
+            console.log("Supabase Profile update completed:", updatedProfile);
 
             console.log("Onboarding completion successful, calling onComplete callback");
             onComplete?.();
         } catch (error) {
-            console.error('Error completing onboarding with Firebase:', error);
+            console.error('Error completing onboarding with Supabase:', error);
         } finally {
             setLoading(false);
         }
