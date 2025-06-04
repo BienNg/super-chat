@@ -1,8 +1,8 @@
 // src/components/CreateChannel.jsx
 import React, { useState } from 'react';
 import { X, Hash, Lock, ChevronDown } from 'lucide-react';
-import { supabase } from '../../../supabaseClient';
-import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../utils/supabaseClient';
+import { useAuth } from '../../../contexts/SupabaseAuthContext';
 import { useChannelClassSync } from '../../../hooks/useChannelClassSync';
 import { CHANNEL_TYPE_OPTIONS } from '../../../utils/channelTypes';
 
@@ -67,18 +67,12 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
                     .from('channels')
                     .insert({
                         name: channelData.name.trim(),
-                        type: channelData.type,
-                        members: [userId], 
-                        admins: [userId], 
+                        description: `Channel for ${channelData.name.trim()}`,
+                        members: [userId],
+                        admins: [userId],
                         created_by: userId,
                         created_at: timestamp,
-                        updated_at: timestamp,
-                        settings: {
-                            allowMemberInvites: false,
-                            isPrivate: channelData.isPrivate,
-                            notifications: true
-                    },
-                    is_private: channelData.isPrivate
+                        updated_at: timestamp
                     })
                     .select()
                     .single();
