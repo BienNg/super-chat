@@ -1,8 +1,8 @@
 // src/App.js
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/SupabaseAuthContext';
-import { AdvancedFirebaseMonitorProvider } from './contexts/AdvancedFirebaseMonitorContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AdvancedSupabaseMonitorProvider } from './contexts/AdvancedSupabaseMonitorContext';
 import { ThreadProvider } from './contexts/ThreadContext';
 import { Login, OnboardingFlow } from './components/auth';
 import { MessagingInterface } from './components/messaging';
@@ -69,9 +69,9 @@ const OnboardingRoute = ({ children }) => {
 
 function App() {
     return (
-        <AuthProvider>
-            <AdvancedFirebaseMonitorProvider>
-                <BrowserRouter>
+        <BrowserRouter>
+            <AuthProvider>
+                <AdvancedSupabaseMonitorProvider>
                     <div className="App">
                         <AdminToggle />
                         <Routes>
@@ -192,9 +192,9 @@ function App() {
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </div>
-                </BrowserRouter>
-            </AdvancedFirebaseMonitorProvider>
-        </AuthProvider>
+                </AdvancedSupabaseMonitorProvider>
+            </AuthProvider>
+        </BrowserRouter>
     );
 }
 

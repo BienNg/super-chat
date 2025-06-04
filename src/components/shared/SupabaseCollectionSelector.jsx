@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { Plus, ChevronDown } from 'lucide-react';
-import { supabase } from '../../utils/supabaseClient';
 
 /**
- * A reusable dropdown selector component that works with Supabase collections
+ * A reusable dropdown selector component that works with backend collections (now Supabase-oriented)
  * 
  * @param {Object} props - Component props
- * @param {string} props.tableName - Name of the Supabase table to use
+ * @param {string} props.collectionName - Name of the Supabase table to use (passed to addOption if it needs it)
  * @param {Object} props.record - The record that will be updated (must have an id field)
  * @param {Function} props.updateRecord - Function to update the record (receives id and updates object)
  * @param {string} props.fieldName - The field name in the record to update
  * @param {string} props.fieldDisplayName - Display name for the field (for placeholder)
- * @param {Array} props.options - Array of string options (preloaded from a hook)
- * @param {Function} props.addOption - Function to add a new option to the collection
+ * @param {Array} props.options - Array of string options (preloaded from a hook, now Supabase-based)
+ * @param {Function} props.addOption - Function to add a new option (receives new value, interacts with Supabase)
  * @param {string} props.addNewLabel - Label for the "Add New" option (default: "+ New Item...")
  * @param {string} props.searchPlaceholder - Placeholder for the search input
  * @param {string} props.noResultsText - Text to show when no results are found
@@ -21,7 +20,7 @@ import { supabase } from '../../utils/supabaseClient';
  * @param {boolean} props.allowEditExisting - Whether to allow editing when the field already has a value (default: false)
  */
 const SupabaseCollectionSelector = ({
-  tableName,
+  collectionName,
   record,
   updateRecord,
   fieldName,
@@ -44,7 +43,6 @@ const SupabaseCollectionSelector = ({
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        // Also check if click is inside the dropdown portal
         const dropdownElement = document.querySelector('[data-dropdown-portal]');
         if (!dropdownElement || !dropdownElement.contains(event.target)) {
           setIsOpen(false);
@@ -67,7 +65,7 @@ const SupabaseCollectionSelector = ({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      window.addEventListener('scroll', handleScroll, true); // Use capture to catch all scroll events
+      window.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', handleResize);
       
       return () => {
@@ -79,7 +77,6 @@ const SupabaseCollectionSelector = ({
   }, [isOpen]);
 
   useEffect(() => {
-    // Auto-hide success message after 2 seconds
     if (showSuccess) {
       const timer = setTimeout(() => {
         setShowSuccess(false);
@@ -88,7 +85,6 @@ const SupabaseCollectionSelector = ({
     }
   }, [showSuccess]);
 
-  // Filter options to exclude the currently selected value
   const filteredOptions = options.filter(option => 
     option.toLowerCase().includes(searchTerm.toLowerCase()) && 
     option !== record[fieldName]
@@ -97,17 +93,8 @@ const SupabaseCollectionSelector = ({
   const handleSelect = async (selectedValue) => {
     try {
       setIsLoading(true);
-      
-      const updates = {
-        [fieldName]: selectedValue
-      };
-      
-      try {
+      const updates = { [fieldName]: selectedValue };
         await updateRecord(record.id, updates);
-      } catch (err) {
-        throw err;
-      }
-      
       setShowSuccess(true);
       setIsOpen(false);
       setSearchTerm('');
@@ -122,15 +109,10 @@ const SupabaseCollectionSelector = ({
     if (searchTerm.trim()) {
       try {
         setIsLoading(true);
+        const newOptionValue = searchTerm.trim();
+        await addOption(newOptionValue, collectionName);
         
-        // First add the new option to the table
-        await addOption(searchTerm.trim());
-        
-        // Then update the record with the new value
-        const updates = {
-          [fieldName]: searchTerm.trim()
-        };
-        
+        const updates = { [fieldName]: newOptionValue };
         await updateRecord(record.id, updates);
         
         setShowSuccess(true);
@@ -144,14 +126,10 @@ const SupabaseCollectionSelector = ({
     }
   };
 
-  // Use the field value if it exists, otherwise use the placeholder
   const displayValue = record[fieldName] || placeholder;
   const isPlaceholder = !record[fieldName];
-  
-  // Determine if the field is editable
   const isEditable = isPlaceholder || allowEditExisting;
 
-  // Calculate dropdown position
   const updateDropdownPosition = () => {
     if (dropdownRef.current) {
       const rect = dropdownRef.current.getBoundingClientRect();
@@ -196,32 +174,31 @@ const SupabaseCollectionSelector = ({
 
       {isOpen && ReactDOM.createPortal(
         <div
-          className="absolute z-50 mt-1 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 max-h-60 overflow-auto"
-          style={{
-            top: `${dropdownPosition.top}px`,
-            left: `${dropdownPosition.left}px`,
-            width: `${dropdownPosition.width}px`
-          }}
           data-dropdown-portal
+          className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+          style={{
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+            minWidth: '200px'
+          }}
         >
-          <div className="p-2">
+          <div className="p-2 border-b border-gray-100">
             <input
               type="text"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
+              placeholder={searchPlaceholder}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               autoFocus
             />
           </div>
           
-          <div className="max-h-40 overflow-y-auto">
+          <div className="py-1">
             {filteredOptions.length > 0 ? (
-              filteredOptions.map((option) => (
+              filteredOptions.map((option, index) => (
                 <div
-                  key={option}
+                  key={index}
                   onClick={(event) => {
                     event.stopPropagation();
                     handleSelect(option);
@@ -229,20 +206,18 @@ const SupabaseCollectionSelector = ({
                   onMouseDown={(event) => {
                     event.stopPropagation();
                   }}
-                  className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+                  className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm text-gray-900 transition-colors"
+                  data-value={option}
                 >
                   {option}
                 </div>
               ))
             ) : (
               <div className="px-3 py-2 text-sm text-gray-500">
-                {searchTerm ? noResultsText : 'Begin typing to search...'}
+                {noResultsText}
               </div>
             )}
-          </div>
-          
-          {searchTerm && !filteredOptions.find(option => option.toLowerCase() === searchTerm.toLowerCase()) && (
-            <div className="border-t border-gray-100">
+            {searchTerm.trim() && addOption && (
               <div
                 onClick={(event) => {
                   event.stopPropagation();
@@ -251,16 +226,12 @@ const SupabaseCollectionSelector = ({
                 onMouseDown={(event) => {
                   event.stopPropagation();
                 }}
-                className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-indigo-600 transition-colors flex items-center space-x-2"
-                data-action={`add-new-${fieldName}`}
+                className="px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 cursor-pointer transition-colors flex items-center"
               >
-                <Plus className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  {addNewLabel}
-                </span>
+                <Plus size={16} className="mr-2" /> {addNewLabel.replace('%s', searchTerm.trim())}
               </div>
+            )}
             </div>
-          )}
         </div>,
         document.body
       )}

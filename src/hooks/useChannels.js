@@ -1,207 +1,153 @@
 // src/hooks/useChannels.js
 import { useState, useEffect, useRef } from 'react';
-import { 
-    collection, 
-    query, 
-    where, 
-    onSnapshot, 
-    orderBy,
-    doc,
-    getDoc
-} from 'firebase/firestore';
-import { db } from '../firebase';
-import { supabase } from '../utils/supabaseClient';
+import { supabase } from '../supabaseClient'; // Adjusted path
 import { useAuth } from '../contexts/AuthContext';
-import { logRealtimeListener, logFirebaseRead } from '../utils/comprehensiveFirebaseTracker';
-
-// Flag to determine if we should use Supabase instead of Firebase
-const USE_SUPABASE = true;
 
 export const useChannels = () => {
     const [channels, setChannels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    const { currentUser } = useAuth();
+    const { currentUser } = useAuth(); // useAuth now provides Supabase user
     
-    // Add cache ref to prevent unnecessary re-subscriptions
     const unsubscribeRef = useRef(null);
     const currentUserIdRef = useRef(null);
     const channelCacheRef = useRef(new Map());
 
     useEffect(() => {
-        if (!currentUser?.uid && !currentUser?.id) {
+        const userId = currentUser?.id;
+
+        if (!userId) {
             setChannels([]);
             setLoading(false);
+            if (unsubscribeRef.current) {
+                // supabase.removeChannel needs the channel object itself
+                // unsubscribeRef.current.unsubscribe(); // This is for direct PG, Supabase client is different
+                supabase.removeChannel(unsubscribeRef.current)
+                unsubscribeRef.current = null;
+            }
+            currentUserIdRef.current = null;
             return;
         }
 
-        const userId = currentUser?.id || currentUser?.uid;
-
-        // If same user and we already have a listener, don't create a new one
-        if (currentUserIdRef.current === userId && unsubscribeRef.current) {
+        if (currentUserIdRef.current === userId && unsubscribeRef.current && unsubscribeRef.current.state === 'joined') {
+            setLoading(false); 
             return;
         }
 
-        // Clean up previous listener if it exists
         if (unsubscribeRef.current) {
-            unsubscribeRef.current();
+             supabase.removeChannel(unsubscribeRef.current)
+            unsubscribeRef.current = null;
         }
 
         currentUserIdRef.current = userId;
         setLoading(true);
+        setError(null);
         
-        if (USE_SUPABASE) {
-            // Fetch channels from Supabase
-            const fetchChannels = async () => {
-                try {
-                    const { data, error } = await supabase
-                        .from('channels')
-                        .select('*')
-                        .contains('members', [userId]);
-                    
-                    if (error) {
-                        console.error('Error fetching channels from Supabase:', error);
-                        setError(error.message);
-                        setLoading(false);
-                        return;
-                    }
-                    
-                    // Set up subscription for realtime updates
-                    const channelSubscription = supabase
-                        .channel('channels-changes')
-                        .on('postgres_changes', 
-                            { 
-                                event: '*', 
-                                schema: 'public', 
-                                table: 'channels',
-                                filter: `members=cs.{${userId}}`
-                            }, 
-                            () => {
-                                fetchChannels(); // Refetch when changes occur
-                            }
-                        )
-                        .subscribe();
-                    
-                    // Sort channels alphabetically by name
-                    const sortedChannels = data ? [...data].sort((a, b) => 
-                        a.name.localeCompare(b.name)
-                    ) : [];
-                    
-                    setChannels(sortedChannels);
-                    setLoading(false);
-                    setError(null);
-                    
-                    // Store the unsubscribe function
-                    unsubscribeRef.current = () => {
-                        channelSubscription.unsubscribe();
-                    };
-                } catch (err) {
-                    console.error('Error in Supabase channels setup:', err);
-                    setError(err.message);
-                    setLoading(false);
-                }
-            };
-            
-            fetchChannels();
-            
-            return () => {
-                if (unsubscribeRef.current) {
-                    unsubscribeRef.current();
-                    unsubscribeRef.current = null;
-                }
-            };
-        } else {
-            // Original Firebase implementation
-            // Query channels where user is a member
-            const channelsQuery = query(
-                collection(db, 'channels'),
-                where('members', 'array-contains', userId),
-                orderBy('createdAt', 'desc')
-            );
-
-            const unsubscribe = onSnapshot(
-                channelsQuery,
-                {
-                    next: (snapshot) => {
-                        // Log the Firebase read operation
-                        logRealtimeListener('channels', snapshot.size, `Real-time channels listener for user ${userId}`);
-                        
-                        const channelData = snapshot.docs.map((doc) => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        // Sort channels alphabetically by name
-                        const sortedChannels = channelData.sort((a, b) => 
-                            a.name.localeCompare(b.name)
-                        );
-                        setChannels(sortedChannels);
-                        setLoading(false);
-                        setError(null);
-                    },
-                    error: (err) => {
-                        // Log the error
-                        logRealtimeListener('channels', 0, `Channels listener error: ${err.message}`);
-                        console.error('Error fetching channels:', err);
-                        setError(err.message);
-                        setLoading(false);
-                    }
-                }
-            );
-
-            unsubscribeRef.current = unsubscribe;
-
-            return () => {
-                if (unsubscribeRef.current) {
-                    unsubscribeRef.current();
-                    unsubscribeRef.current = null;
-                }
-            };
-        }
-    }, [currentUser?.uid, currentUser?.id]);
-
-    const getChannelById = async (channelId) => {
-        // Check cache first
-        if (channelCacheRef.current.has(channelId)) {
-            return channelCacheRef.current.get(channelId);
-        }
-
-        try {
-            if (USE_SUPABASE) {
-                // Get channel from Supabase
-                const { data, error } = await supabase
+        const fetchChannels = async () => {
+            try {
+                setLoading(true); 
+                const { data, error: fetchError } = await supabase
                     .from('channels')
                     .select('*')
-                    .eq('id', channelId)
-                    .single();
+                    .contains('members', [userId]) 
+                    .order('name', { ascending: true }); 
                 
-                if (error) {
-                    console.error('Error fetching channel from Supabase:', error);
+                if (fetchError) {
+                    console.error('Error fetching channels from Supabase:', fetchError);
+                    setError(fetchError.message);
+                    setChannels([]); 
+                } else {
+                    setChannels(data || []);
+                    setError(null);
+                }
+            } catch (err) {
+                console.error('Error in Supabase fetchChannels:', err);
+                setError(err.message);
+                setChannels([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+            
+        fetchChannels(); 
+
+        const uniqueChannelName = `realtime:channels:user:${userId}`;
+        const channelSubscription = supabase
+            .channel(uniqueChannelName)
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'channels',
+                    // RLS will ensure user only gets updates for channels they are members of.
+                    // The `contains` filter on fetchChannels handles the initial data load correctly.
+                    // Re-fetching on any change to the 'channels' table (that RLS allows the user to see) is a common pattern.
+                }, 
+                (payload) => {
+                    // console.log('Channel change detected, refetching for user:', userId, payload);
+                    fetchChannels(); 
+                }
+            )
+            .subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log(`Successfully subscribed to ${uniqueChannelName}`);
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.error(`Subscription error on ${uniqueChannelName} for user ${userId}:`, status, err);
+                    setError(`Realtime subscription failed: ${status}. Please check RLS policies on the channels table.`);
+                } else if (status === 'CLOSED'){
+                    // console.log(`Subscription to ${uniqueChannelName} closed.`);
+                }
+            });
+        
+        unsubscribeRef.current = channelSubscription;
+        
+        return () => {
+            if (unsubscribeRef.current) {
+                supabase.removeChannel(unsubscribeRef.current);
+                unsubscribeRef.current = null;
+                // console.log(`Unsubscribed from ${uniqueChannelName} for user ${userId}`);
+            }
+        };
+    }, [currentUser?.id]); 
+
+    const getChannelById = async (channelId) => {
+        if (!channelId) return null;
+        if (channelCacheRef.current.has(channelId)) {
+            const cachedChannel = channelCacheRef.current.get(channelId);
+            // Ensure cache returns a promise-like structure or handle appropriately where called
+            return cachedChannel;
+        }
+        
+        // setLoading(true); // Avoid global loading for a single get by ID if used independently
+        let localLoading = true; // Or manage local loading state if needed
+
+        try {
+            const { data, error: fetchError } = await supabase
+                .from('channels')
+                .select('*')
+                .eq('id', channelId)
+                .single();
+            
+            if (fetchError) {
+                if (fetchError.code === 'PGRST116') { 
+                    channelCacheRef.current.set(channelId, null); 
                     return null;
                 }
-                
-                // Cache the result
-                channelCacheRef.current.set(channelId, data);
-                
-                return data;
-            } else {
-                // Original Firebase implementation
-                const channelRef = doc(db, 'channels', channelId);
-                const channelSnap = await getDoc(channelRef);
-                
-                // Log the Firebase read operation
-                logFirebaseRead('channels', channelSnap.exists() ? 1 : 0, `Single channel read for ${channelId}`);
-                
-                const result = channelSnap.exists() ? { id: channelSnap.id, ...channelSnap.data() } : null;
-                
-                // Cache the result
-                channelCacheRef.current.set(channelId, result);
-                
-                return result;
+                console.error('Error fetching channel by ID from Supabase:', fetchError);
+                // setError(fetchError.message); // Avoid setting global error for a single get
+                throw fetchError; // Re-throw for local handling
             }
-        } catch (error) {
-            console.error('Error fetching channel:', error);
-            return null;
+            
+            channelCacheRef.current.set(channelId, data);
+            return data;
+        } catch (err) {
+            console.error('Error in Supabase getChannelById:', err);
+            // setError(err.message); // Avoid setting global error
+            throw err; // Re-throw for local handling
+        } finally {
+            // setLoading(false);
+            localLoading = false;
         }
     };
 

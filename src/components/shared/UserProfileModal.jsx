@@ -50,7 +50,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, userProfile, currentUser, onLog
   useEffect(() => {
     if (userProfile) {
       setEditedProfile({
-        fullName: userProfile.fullName || '',
+        fullName: userProfile.displayName || userProfile.fullName || '',
         role: userProfile.role || '',
         department: userProfile.department || '',
         bio: userProfile.bio || '',
@@ -385,7 +385,14 @@ const ProfileSettingsModal = ({ isOpen, onClose, userProfile, currentUser, onLog
           These actions cannot be undone. Please be careful.
         </p>
         <button
-          onClick={onLogout}
+          onClick={() => {
+            console.log('Sign Out button clicked in UserProfileModal.jsx. onLogout prop:', onLogout);
+            if (onLogout) {
+              onLogout();
+            } else {
+              console.error('onLogout prop is undefined in UserProfileModal.jsx');
+            }
+          }}
           className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
         >
           Sign Out
@@ -461,7 +468,7 @@ const ProfileSettingsModal = ({ isOpen, onClose, userProfile, currentUser, onLog
                       // Reset changes
                       if (userProfile) {
                         setEditedProfile({
-                          fullName: userProfile.fullName || '',
+                          fullName: userProfile.displayName || userProfile.fullName || '',
                           role: userProfile.role || '',
                           department: userProfile.department || '',
                           bio: userProfile.bio || '',

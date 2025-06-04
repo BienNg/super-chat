@@ -1,8 +1,7 @@
 // src/components/OnboardingFlow.jsx
 import React, { useState, useEffect } from 'react';
 import { Check, Upload, User, Users, DollarSign, MessageSquare, Headphones, Camera, Plus } from 'lucide-react';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
-import { supabase } from '../../utils/supabaseClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 const OnboardingFlow = ({ onComplete }) => {
     const [currentScreen, setCurrentScreen] = useState(1);
@@ -15,40 +14,8 @@ const OnboardingFlow = ({ onComplete }) => {
         photo: null
     });
     const [loading, setLoading] = useState(false);
-    const [tableSchema, setTableSchema] = useState(null);
 
     const { currentUser, updateUserProfile } = useAuth();
-
-    // Fetch table schema on component mount to diagnose issues
-    useEffect(() => {
-        const fetchSchema = async () => {
-            try {
-                // Get schema information for user_profiles table
-                const { data, error } = await supabase
-                    .from('user_profiles')
-                    .select('*')
-                    .limit(1);
-                
-                if (error) {
-                    console.error('Error fetching schema:', error);
-                    return;
-                }
-                
-                // Log the schema for debugging
-                if (data && data.length > 0) {
-                    const schemaColumns = Object.keys(data[0]);
-                    console.log('Available columns in user_profiles:', schemaColumns);
-                    setTableSchema(schemaColumns);
-                } else {
-                    console.log('No data found in user_profiles table');
-                }
-            } catch (error) {
-                console.error('Exception fetching schema:', error);
-            }
-        };
-        
-        fetchSchema();
-    }, []);
 
     const roles = [
         { id: 'teacher', name: 'Teacher', description: 'Manage classes and student progress', icon: Users },
@@ -75,60 +42,47 @@ const OnboardingFlow = ({ onComplete }) => {
     const handleCompleteSetup = async () => {
         try {
             setLoading(true);
-            console.log("Starting onboarding completion process");
+            console.log("Starting onboarding completion process with Firebase Auth");
             
             if (!currentUser) {
                 console.error("Error: currentUser is undefined in handleCompleteSetup");
+                setLoading(false);
                 throw new Error("User not authenticated");
             }
             
-            console.log("Current user:", currentUser.id);
+            console.log("Current user for Firestore update:", currentUser.uid);
             
-            const finalRoles = selectedRoles.map((roleId) => {
-                if (roleId === 'custom') {
-                    return { id: 'custom', name: customRole || 'Custom Role' };
-                }
-                const role = roles.find((r) => r.id === roleId);
-                return { id: roleId, name: role?.name || roleId };
-            });
-            
-            console.log("Prepared roles for update:", finalRoles);
+            // Determine primary role
+            let primaryRole = '';
+            if (selectedRoles.includes('custom') && customRole) {
+                primaryRole = customRole;
+            } else if (selectedRoles.length > 0) {
+                const firstSelectedRole = roles.find(r => r.id === selectedRoles[0]);
+                primaryRole = firstSelectedRole ? firstSelectedRole.name : selectedRoles[0];
+            }
 
-            // Create base update data
-            const baseUpdateData = {
-                roles: finalRoles,
-                display_name: profileData.fullName,
+            const updateData = {
+                displayName: profileData.fullName,
+                role: primaryRole,
                 department: profileData.department,
-                is_onboarding_complete: true
+                bio: profileData.bio,
+                roles: selectedRoles.map(roleId => {
+                    if (roleId === 'custom') return customRole || 'Custom';
+                    const roleObj = roles.find(r => r.id === roleId);
+                    return roleObj ? roleObj.name : roleId;
+                }),
+                isOnboardingComplete: true,
             };
             
-            // Only include fields that exist in the schema
-            const updateData = {};
+            console.log("About to update Firestore profile with data:", updateData);
             
-            if (tableSchema) {
-                // Filter update data to only include fields that exist in the schema
-                Object.keys(baseUpdateData).forEach(key => {
-                    if (tableSchema.includes(key)) {
-                        updateData[key] = baseUpdateData[key];
-                    } else {
-                        console.log(`Skipping field ${key} as it doesn't exist in the schema`);
-                    }
-                });
-            } else {
-                // If we couldn't fetch the schema, use a minimal set of fields
-                updateData.display_name = profileData.fullName;
-                updateData.is_onboarding_complete = true;
-            }
-            
-            console.log("About to update profile with data:", updateData);
-            
-            const updatedProfile = await updateUserProfile(currentUser.id, updateData);
-            console.log("Profile update completed:", updatedProfile);
+            await updateUserProfile(currentUser.uid, updateData);
+            console.log("Firestore Profile update completed.");
 
             console.log("Onboarding completion successful, calling onComplete callback");
             onComplete?.();
         } catch (error) {
-            console.error('Error completing onboarding:', error);
+            console.error('Error completing onboarding with Firebase:', error);
         } finally {
             setLoading(false);
         }

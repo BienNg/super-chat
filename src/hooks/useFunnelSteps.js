@@ -1,19 +1,26 @@
 import { useEffect, useState, useCallback } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient'; // Import Supabase client
 
 export function useFunnelSteps() {
   const [funnelSteps, setFunnelSteps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchFunnelSteps = useCallback(async () => {
     try {
       setLoading(true);
-      const snapshot = await getDocs(collection(db, 'categories'));
-      const steps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setFunnelSteps(steps);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+      const { data, error: fetchError } = await supabase
+        .from('categories') // Assuming your Supabase table is named 'categories'
+        .select('id, value'); // Explicitly select fields, assuming 'value' stores the step name
+      
+      if (fetchError) throw fetchError;
+
+      setFunnelSteps(data || []);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      setError(err.message);
+      setFunnelSteps([]);
     } finally {
       setLoading(false);
     }
@@ -21,25 +28,51 @@ export function useFunnelSteps() {
 
   useEffect(() => { 
     fetchFunnelSteps(); 
+
+    const subscription = supabase
+      .channel('public:categories')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'categories' },
+        (payload) => {
+          // console.log('Categories change received!', payload);
+          fetchFunnelSteps(); // Refetch categories on any change
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, [fetchFunnelSteps]);
 
-  const addFunnelStep = async (step) => {
+  const addFunnelStep = async (stepValue) => {
     try {
-      const trimmedStep = step.trim();
-      const exists = funnelSteps.some(existingStep => 
-        existingStep.value.toLowerCase() === trimmedStep.toLowerCase()
-      );
-      
-      if (exists) {
+      const trimmedStep = stepValue.trim();
+      // Client-side check for existence (optional, can be handled by DB constraints)
+      const { data: existing, error: checkError } = await supabase
+        .from('categories')
+        .select('id')
+        .ilike('value', trimmedStep) // Case-insensitive check
+        .maybeSingle(); // Returns one row or null
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116: 0 rows
+        throw checkError;
+      }
+      if (existing) {
         throw new Error(`Category "${trimmedStep}" already exists`);
       }
       
-      const docRef = await addDoc(collection(db, 'categories'), { value: trimmedStep });
+      const { data: newStep, error: insertError } = await supabase
+        .from('categories')
+        .insert({ value: trimmedStep })
+        .select('id, value')
+        .single(); // Expecting a single inserted row back
+
+      if (insertError) throw insertError;
       
-      // Add to local state immediately
-      const newStep = { id: docRef.id, value: trimmedStep };
-      setFunnelSteps(prev => [...prev, newStep]);
-      
+      // No need to manually update state if real-time listener is effective
+      // setFunnelSteps(prev => [...prev, newStep]); 
       return newStep;
     } catch (error) {
       console.error('Error adding category:', error);
@@ -50,22 +83,35 @@ export function useFunnelSteps() {
   const updateFunnelStep = async (id, newValue) => {
     try {
       const trimmedValue = newValue.trim();
-      const exists = funnelSteps.some(existingStep => 
-        existingStep.value.toLowerCase() === trimmedValue.toLowerCase() && existingStep.id !== id
-      );
-      
-      if (exists) {
+      // Client-side check for existence (optional)
+      const { data: existing, error: checkError } = await supabase
+        .from('categories')
+        .select('id')
+        .ilike('value', trimmedValue)
+        .not('id', 'eq', id) // Exclude current item from check
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') { 
+        throw checkError;
+      }
+      if (existing) {
         throw new Error(`Category "${trimmedValue}" already exists`);
       }
       
-      await updateDoc(doc(db, 'categories', id), { value: trimmedValue });
+      const { data: updatedStep, error: updateError } = await supabase
+        .from('categories')
+        .update({ value: trimmedValue })
+        .eq('id', id)
+        .select('id, value')
+        .single();
+
+      if (updateError) throw updateError;
       
-      // Update local state immediately
-      setFunnelSteps(prev => prev.map(step => 
-        step.id === id ? { ...step, value: trimmedValue } : step
-      ));
-      
-      return { id, value: trimmedValue };
+      // No need to manually update state if real-time listener is effective
+      // setFunnelSteps(prev => prev.map(step => 
+      //   step.id === id ? { ...step, value: trimmedValue } : step
+      // ));
+      return updatedStep;
     } catch (error) {
       console.error('Error updating category:', error);
       throw error;
@@ -74,8 +120,14 @@ export function useFunnelSteps() {
 
   const deleteFunnelStep = async (id) => {
     try {
-      await deleteDoc(doc(db, 'categories', id));
-      setFunnelSteps(prev => prev.filter(step => step.id !== id));
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      // No need to manually update state if real-time listener is effective
+      // setFunnelSteps(prev => prev.filter(step => step.id !== id));
     } catch (error) {
       console.error('Error deleting category:', error);
       throw error;
@@ -83,9 +135,10 @@ export function useFunnelSteps() {
   };
 
   return { 
-    funnelSteps: funnelSteps.map(step => step.value),
-    funnelStepsWithIds: funnelSteps, // For the settings modal
+    funnelSteps: funnelSteps.map(step => step.value), // Returns array of string values
+    funnelStepsWithIds: funnelSteps, // Returns array of {id, value} objects
     loading, 
+    error, // Expose error state
     addFunnelStep, 
     updateFunnelStep,
     deleteFunnelStep 

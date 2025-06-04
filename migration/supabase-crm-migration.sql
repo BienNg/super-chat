@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS classes (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
-  course_id BIGINT REFERENCES courses(id),
+  course_id UUID REFERENCES courses(id),
   start_date TIMESTAMP WITH TIME ZONE,
   end_date TIMESTAMP WITH TIME ZONE,
   schedule TEXT,
@@ -84,9 +84,9 @@ CREATE TABLE IF NOT EXISTS classes (
 -- Create the enrollments table
 CREATE TABLE IF NOT EXISTS enrollments (
   id BIGSERIAL PRIMARY KEY,
-  student_id BIGINT REFERENCES students(id) ON DELETE CASCADE,
-  course_id BIGINT REFERENCES courses(id) ON DELETE CASCADE,
-  class_id BIGINT REFERENCES classes(id) ON DELETE SET NULL,
+  student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+  course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
+  class_id UUID REFERENCES classes(id) ON DELETE SET NULL,
   
   -- Denormalized student data
   student_name TEXT,
@@ -129,9 +129,9 @@ CREATE TABLE IF NOT EXISTS enrollments (
 -- Create the payments table
 CREATE TABLE IF NOT EXISTS payments (
   id BIGSERIAL PRIMARY KEY,
-  student_id BIGINT REFERENCES students(id) ON DELETE SET NULL,
-  course_id BIGINT REFERENCES courses(id) ON DELETE SET NULL,
-  enrollment_id BIGINT REFERENCES enrollments(id) ON DELETE SET NULL,
+  student_id UUID REFERENCES students(id) ON DELETE SET NULL,
+  course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
+  enrollment_id UUID REFERENCES enrollments(id) ON DELETE SET NULL,
   amount DECIMAL NOT NULL,
   currency TEXT DEFAULT 'VND',
   payment_method TEXT,
@@ -144,6 +144,29 @@ CREATE TABLE IF NOT EXISTS payments (
   created_by UUID REFERENCES auth.users
 );
 
+-- Create the accounts table
+CREATE TABLE IF NOT EXISTS accounts (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT,
+  currency TEXT,
+  is_default BOOLEAN DEFAULT FALSE,
+  balance NUMERIC DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create the discounts table
+CREATE TABLE IF NOT EXISTS discounts (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT, -- e.g., percentage, fixed
+  value NUMERIC NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Add RLS policies for security
 ALTER TABLE countries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cities ENABLE ROW LEVEL SECURITY;
@@ -154,6 +177,8 @@ ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE discounts ENABLE ROW LEVEL SECURITY;
 
 -- Create policies that allow authenticated users to see all data
 CREATE POLICY "Allow authenticated users to see all countries" ON countries
@@ -181,6 +206,12 @@ CREATE POLICY "Allow authenticated users to see all enrollments" ON enrollments
   FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "Allow authenticated users to see all payments" ON payments
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated users to see all accounts" ON accounts
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated users to see all discounts" ON discounts
   FOR SELECT TO authenticated USING (true);
 
 -- Create policies that allow authenticated users to insert data
@@ -211,6 +242,12 @@ CREATE POLICY "Allow authenticated users to insert enrollments" ON enrollments
 CREATE POLICY "Allow authenticated users to insert payments" ON payments
   FOR INSERT TO authenticated WITH CHECK (true);
 
+CREATE POLICY "Allow authenticated users to insert accounts" ON accounts
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated users to insert discounts" ON discounts
+  FOR INSERT TO authenticated WITH CHECK (true);
+
 -- Create policies that allow authenticated users to update data
 CREATE POLICY "Allow authenticated users to update countries" ON countries
   FOR UPDATE TO authenticated USING (true);
@@ -239,6 +276,12 @@ CREATE POLICY "Allow authenticated users to update enrollments" ON enrollments
 CREATE POLICY "Allow authenticated users to update payments" ON payments
   FOR UPDATE TO authenticated USING (true);
 
+CREATE POLICY "Allow authenticated users to update accounts" ON accounts
+  FOR UPDATE TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated users to update discounts" ON discounts
+  FOR UPDATE TO authenticated USING (true);
+
 -- Create policies that allow authenticated users to delete data
 CREATE POLICY "Allow authenticated users to delete countries" ON countries
   FOR DELETE TO authenticated USING (true);
@@ -265,4 +308,10 @@ CREATE POLICY "Allow authenticated users to delete enrollments" ON enrollments
   FOR DELETE TO authenticated USING (true);
 
 CREATE POLICY "Allow authenticated users to delete payments" ON payments
+  FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated users to delete accounts" ON accounts
+  FOR DELETE TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated users to delete discounts" ON discounts
   FOR DELETE TO authenticated USING (true); 

@@ -1,15 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc 
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient'; // Import Supabase client
 
 export const useDiscounts = () => {
   const [discounts, setDiscounts] = useState([]);
@@ -17,42 +7,59 @@ export const useDiscounts = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const discountsRef = collection(db, 'discounts');
-    const q = query(discountsRef, orderBy('name', 'asc'));
+    const fetchDiscounts = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('discounts')
+          .select('*')
+          .order('name', { ascending: true });
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const discountsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setDiscounts(discountsData);
-        setLoading(false);
+        if (error) throw error;
+        setDiscounts(data || []);
         setError(null);
-      },
-      (err) => {
+      } catch (err) {
         console.error('Error fetching discounts:', err);
         setError(err.message);
+        setDiscounts([]);
+      } finally {
         setLoading(false);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    fetchDiscounts();
+
+    const subscription = supabase
+      .channel('public:discounts')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'discounts' },
+        (payload) => {
+          fetchDiscounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   const addDiscount = async (discountData) => {
     try {
-      const docRef = await addDoc(collection(db, 'discounts'), {
+      const { data, error } = await supabase
+        .from('discounts')
+        .insert([
+          {
         ...discountData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      
-      // Return the new discount with its ID
-      return {
-        id: docRef.id,
-        ...discountData
-      };
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return data ? data[0] : null;
     } catch (err) {
       console.error('Error adding discount:', err);
       throw err;
@@ -61,11 +68,15 @@ export const useDiscounts = () => {
 
   const updateDiscount = async (discountId, updates) => {
     try {
-      const discountRef = doc(db, 'discounts', discountId);
-      await updateDoc(discountRef, {
+      const { error } = await supabase
+        .from('discounts')
+        .update({
         ...updates,
-        updatedAt: new Date().toISOString()
-      });
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', discountId);
+
+      if (error) throw error;
     } catch (err) {
       console.error('Error updating discount:', err);
       throw err;
@@ -74,7 +85,12 @@ export const useDiscounts = () => {
 
   const deleteDiscount = async (discountId) => {
     try {
-      await deleteDoc(doc(db, 'discounts', discountId));
+      const { error } = await supabase
+        .from('discounts')
+        .delete()
+        .eq('id', discountId);
+
+      if (error) throw error;
     } catch (err) {
       console.error('Error deleting discount:', err);
       throw err;
@@ -87,6 +103,6 @@ export const useDiscounts = () => {
     error,
     addDiscount,
     updateDiscount,
-    deleteDiscount
+    deleteDiscount,
   };
 }; 

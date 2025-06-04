@@ -24,7 +24,7 @@ import { db } from '../../firebase';
  * @param {string} props.placeholder - Placeholder text when no value is selected
  * @param {boolean} props.allowEditExisting - Whether to allow editing when the field already has values (default: false)
  */
-const FirebaseMultiSelectSelector = ({
+const SupabaseMultiSelectSelector = ({
   collectionName,
   record,
   updateRecord,
@@ -330,4 +330,4 @@ const FirebaseMultiSelectSelector = ({
   );
 };
 
-export default FirebaseMultiSelectSelector; 
+export default SupabaseMultiSelectSelector; 

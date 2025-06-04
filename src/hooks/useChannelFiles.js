@@ -1,91 +1,103 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-    collection, 
-    query, 
-    where,
-    orderBy, 
-    getDocs,
-    deleteDoc,
-    doc,
-    getDoc,
-    updateDoc,
-    serverTimestamp,
-    limit
-} from 'firebase/firestore';
-import { getStorage, ref, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient'; // Import Supabase client
 import { useAuth } from '../contexts/AuthContext';
+
+// Helper to convert potential Supabase timestamp strings to Date objects
+const toDateSafe = (timestamp) => {
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Date) return timestamp;
+  const parsedDate = new Date(timestamp);
+  return isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+};
 
 export const useChannelFiles = (channelId) => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     
-    const { currentUser, userProfile } = useAuth();
+    const { currentUser, userProfile } = useAuth(); // Assuming Supabase user
 
-    // Use getDocs instead of onSnapshot to reduce Firestore load
     const fetchChannelFiles = useCallback(async () => {
-        if (!channelId) {
+        if (!channelId || !currentUser?.id) {
             setFiles([]);
+            setLoading(false);
             return;
         }
 
         setLoading(true);
+        setError(null);
         
         try {
-            // Query files in the channel by looking at messages with attachments
-            const messagesQuery = query(
-                collection(db, 'channels', channelId, 'messages'),
-                where('attachments', '!=', null),
-                orderBy('createdAt', 'desc'),
-                limit(200) // Reasonable limit for performance
-            );
+            // Query messages in the channel that have attachments
+            const { data: messages, error: messagesError } = await supabase
+                .from('messages')
+                .select('id, attachments, created_at, user_id, profiles ( id, display_name ) ') // Assuming author info is in a related 'profiles' table
+                .eq('channel_id', channelId)
+                .not('attachments', 'is', null) // Check that attachments is not null
+                .order('created_at', { ascending: false })
+                .limit(200);
 
-            const snapshot = await getDocs(messagesQuery);
+            if (messagesError) throw messagesError;
+
             const allFiles = [];
-            
-            snapshot.docs.forEach((doc) => {
-                const messageData = doc.data();
-                if (messageData.attachments && Array.isArray(messageData.attachments)) {
-                    messageData.attachments.forEach((attachment, index) => {
-                        allFiles.push({
-                            id: `${doc.id}_${index}`, // Unique ID for each file
-                            messageId: doc.id,
-                            ...attachment,
-                            uploadedAt: messageData.createdAt,
-                            uploadedBy: messageData.author,
-                            channelId: channelId
+            if (messages) {
+                messages.forEach((message) => {
+                    if (message.attachments && Array.isArray(message.attachments)) {
+                        message.attachments.forEach((attachment, index) => {
+                            allFiles.push({
+                                id: `${message.id}_file_${index}`, // Unique ID for each file derived from message and index
+                                messageId: message.id,
+                                ...attachment, // Assuming attachment object has name, type, url (or path for Supabase storage)
+                                uploadedAt: toDateSafe(message.created_at),
+                                uploadedBy: message.profiles ? { id: message.user_id, displayName: message.profiles.display_name } : { id: message.user_id, displayName: 'Unknown User' },
+                                channelId: channelId,
+                                // Supabase specific: storage_path might be stored in attachment e.g. attachment.storagePath
+                                storagePath: attachment.storagePath || null 
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
+            }
             
             setFiles(allFiles);
-            setError(null);
         } catch (err) {
             console.error('Error fetching channel files:', err);
             setError(err.message);
+            setFiles([]);
         } finally {
             setLoading(false);
         }
-    }, [channelId]);
+    }, [channelId, currentUser?.id]);
 
-    // Load channel files on mount and when channelId changes
     useEffect(() => {
         fetchChannelFiles();
-    }, [fetchChannelFiles]);
 
-    // Get channel files (main function)
+        if (!channelId || !currentUser?.id) return;
+
+        // Real-time listener for new messages or changes to messages in the current channel
+        const messageSubscription = supabase
+            .channel(`public:messages:channel_id=eq.${channelId}`)
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` }, 
+                (payload) => {
+                    // console.log('Message change received, refetching files:', payload);
+                    // Check if attachments were affected, or just refetch all for simplicity
+                    fetchChannelFiles();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(messageSubscription);
+        };
+    }, [fetchChannelFiles, channelId, currentUser?.id]);
+
     const getChannelFiles = useCallback(async () => {
-        // This is handled by the useEffect above
-        // This function exists for consistency with the API
         return files;
     }, [files]);
 
-    // Search files by name or type
     const searchFiles = useCallback((searchQuery) => {
         if (!searchQuery) return files;
-
         const query = searchQuery.toLowerCase();
         return files.filter(file => 
             file.name?.toLowerCase().includes(query) ||
@@ -94,307 +106,174 @@ export const useChannelFiles = (channelId) => {
         );
     }, [files]);
 
-    // Get files by type
     const getFilesByType = useCallback((fileType) => {
         if (!fileType || fileType === 'all') return files;
-
         return files.filter(file => {
             const type = file.type?.toLowerCase() || '';
-            
             switch (fileType.toLowerCase()) {
-                case 'image':
-                    return type.startsWith('image/');
-                case 'video':
-                    return type.startsWith('video/');
-                case 'audio':
-                    return type.startsWith('audio/');
+                case 'image': return type.startsWith('image/');
+                case 'video': return type.startsWith('video/');
+                case 'audio': return type.startsWith('audio/');
                 case 'document':
-                    return type.includes('pdf') || 
-                           type.includes('document') || 
-                           type.includes('text') ||
-                           type.includes('msword') ||
-                           type.includes('wordprocessingml') ||
-                           type.includes('spreadsheet') ||
-                           type.includes('presentationml');
+                    return type.includes('pdf') || type.includes('document') || type.includes('text') ||
+                           type.includes('msword') || type.includes('wordprocessingml') || 
+                           type.includes('spreadsheet') || type.includes('presentationml');
                 case 'archive':
-                    return type.includes('zip') || 
-                           type.includes('rar') || 
-                           type.includes('tar') ||
-                           type.includes('gzip') ||
-                           type.includes('7z');
-                default:
-                    return type.includes(fileType.toLowerCase());
+                    return type.includes('zip') || type.includes('rar') || type.includes('tar') ||
+                           type.includes('gzip') || type.includes('7z');
+                default: return type.includes(fileType.toLowerCase());
             }
         });
     }, [files]);
 
-    // Download file
     const downloadFile = async (fileId) => {
         try {
             const file = files.find(f => f.id === fileId);
-            if (!file) {
-                throw new Error('File not found');
+            if (!file) throw new Error('File not found');
+
+            let downloadURL = file.url; // If a direct URL is already in the attachment
+
+            if (!downloadURL && file.storagePath) { // If using Supabase storage path
+                // Assumes a bucket named 'channel_files' or similar; adjust as needed.
+                const { data, error } = await supabase.storage
+                    .from('channel_files') // Replace 'channel_files' with your actual bucket name
+                    .createSignedUrl(file.storagePath, 60 * 5); // Signed URL valid for 5 minutes
+                
+                if (error) throw error;
+                downloadURL = data.signedUrl;
             }
 
-            if (file.url) {
-                // If direct URL is available, use it
-                const link = document.createElement('a');
-                link.href = file.url;
-                link.download = file.name || 'download';
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } else if (file.storageRef) {
-                // Get download URL from Firebase Storage
-                const storage = getStorage();
-                const fileRef = ref(storage, file.storageRef);
-                const downloadURL = await getDownloadURL(fileRef);
-                
-                const link = document.createElement('a');
-                link.href = downloadURL;
-                link.download = file.name || 'download';
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } else {
-                throw new Error('File URL not available');
-            }
+            if (!downloadURL) throw new Error('File URL or storage path not available');
+
+            const link = document.createElement('a');
+            link.href = downloadURL;
+            link.download = file.name || 'download';
+            link.target = '_blank'; // Open in new tab, useful for PDFs or if direct download fails
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
             return { success: true, fileId };
-
         } catch (error) {
             console.error('Error downloading file:', error);
+            setError('Failed to download file: ' + error.message);
             throw error;
         }
     };
 
-    // Check if user can delete file
     const canDeleteFile = useCallback(async (fileId) => {
-        if (!currentUser || !fileId) return false;
-
+        if (!currentUser?.id || !fileId) return false;
         try {
             const file = files.find(f => f.id === fileId);
             if (!file) return false;
 
-            // User can delete their own files
-            if (file.uploadedBy?.id === currentUser.uid) return true;
+            if (file.uploadedBy?.id === currentUser.id) return true;
 
-            // Check if user is channel admin/moderator
-            const channelDoc = await getDoc(doc(db, 'channels', channelId));
-            if (channelDoc.exists()) {
-                const channelData = channelDoc.data();
-                if (channelData.admins?.includes(currentUser.uid) || 
-                    channelData.moderators?.includes(currentUser.uid)) {
-                    return true;
-                }
+            // Check channel ownership or admin role (simplified)
+            // This assumes your 'channels' table has an 'owner_id' or similar, 
+            // or you have a separate table for channel admins/moderators.
+            const { data: channelData, error: channelError } = await supabase
+                .from('channels')
+                .select('owner_id') // Or other relevant admin/moderator fields
+                .eq('id', channelId)
+                .single();
+
+            if (channelError) {
+                console.error('Error fetching channel data for permissions:', channelError);
+                // Fallback: don't allow deletion if channel info is unavailable
+                return userProfile?.role === 'admin'; 
             }
+            
+            // Example: if channel has owner_id and current user is owner
+            if (channelData && channelData.owner_id === currentUser.id) return true;
+            // TODO: Add more sophisticated role/permission checks based on your schema
+            // (e.g., checking a channel_memberships table with roles)
 
-            // Check if user is system admin
-            if (userProfile?.role === 'admin') return true;
-
-            return false;
-
+            return userProfile?.role === 'admin'; // System admin can delete
         } catch (error) {
             console.error('Error checking file deletion permissions:', error);
             return false;
         }
     }, [files, currentUser, userProfile, channelId]);
 
-    // Delete file
     const deleteFile = async (fileId) => {
-        if (!fileId || !currentUser) {
+        if (!fileId || !currentUser?.id) {
             throw new Error('Missing required parameters for file deletion');
         }
 
         try {
+            setError(null);
             const file = files.find(f => f.id === fileId);
-            if (!file) {
-                throw new Error('File not found');
-            }
+            if (!file) throw new Error('File not found');
 
-            // Check permissions
             const hasPermission = await canDeleteFile(fileId);
             if (!hasPermission) {
                 throw new Error('You do not have permission to delete this file');
             }
 
-            // Delete from Firebase Storage if storageRef exists
-            if (file.storageRef) {
+            // 1. Delete from Supabase Storage (if storagePath exists)
+            if (file.storagePath) {
                 try {
-                    const storage = getStorage();
-                    const fileRef = ref(storage, file.storageRef);
-                    await deleteObject(fileRef);
+                    // Replace 'channel_files' with your actual bucket name
+                    const { error: storageError } = await supabase.storage
+                        .from('channel_files') 
+                        .remove([file.storagePath]);
+                    if (storageError) {
+                        console.warn('Error deleting file from Supabase storage:', storageError);
+                        // Decide if you want to throw or continue to remove from message
+                    }
                 } catch (storageError) {
-                    console.warn('Error deleting file from storage:', storageError);
-                    // Continue with message update even if storage deletion fails
+                    console.warn('Exception during file deletion from storage:', storageError);
                 }
             }
 
-            // Remove attachment from the message
-            const messageRef = doc(db, 'channels', channelId, 'messages', file.messageId);
-            const messageDoc = await getDoc(messageRef);
-            
-            if (messageDoc.exists()) {
-                const messageData = messageDoc.data();
-                const updatedAttachments = messageData.attachments.filter(
-                    (_, index) => `${file.messageId}_${index}` !== fileId
-                );
+            // 2. Remove attachment from the message in Supabase DB
+            const { data: message, error: fetchMessageError } = await supabase
+                .from('messages')
+                .select('attachments')
+                .eq('id', file.messageId)
+                .single();
 
-                await updateDoc(messageRef, {
+            if (fetchMessageError) throw fetchMessageError;
+            if (!message) throw new Error('Original message not found to remove attachment');
+
+            const updatedAttachments = (message.attachments || []).filter(
+                att => !(att.name === file.name && att.storagePath === file.storagePath) // Example: identify by name and path
+                // Or, if attachments have unique IDs: att.id !== file.attachment_id (if `file` has `attachment_id`)
+            );
+
+            const { error: updateMessageError } = await supabase
+                .from('messages')
+                .update({ 
                     attachments: updatedAttachments,
-                    updatedAt: serverTimestamp()
-                });
-            }
+                    updated_at: new Date().toISOString() 
+                })
+                .eq('id', file.messageId);
+
+            if (updateMessageError) throw updateMessageError;
+            
+            // Refetch files as the source (messages) has changed
+            // The real-time listener should ideally handle this, but a manual call ensures consistency.
+            // await fetchChannelFiles(); // Or rely on real-time update
 
             return { success: true, fileId };
-
-        } catch (error) {
-            console.error('Error deleting file:', error);
-            throw error;
+        } catch (err) {
+            console.error('Error deleting file record:', err);
+            setError('Failed to delete file: ' + err.message);
+            throw err;
         }
     };
 
-    // Get file statistics
-    const getFileStats = useCallback(() => {
-        if (!files.length) return null;
-
-        const stats = {
-            total: files.length,
-            totalSize: files.reduce((sum, file) => sum + (file.size || 0), 0),
-            byType: {},
-            byUploader: {},
-            recentUploads: files.filter(file => {
-                const uploadDate = file.uploadedAt?.toDate?.() || new Date(file.uploadedAt);
-                const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-                return uploadDate > dayAgo;
-            }).length
-        };
-
-        // Count by type
-        files.forEach(file => {
-            const type = file.type?.split('/')[0] || 'unknown';
-            stats.byType[type] = (stats.byType[type] || 0) + 1;
-        });
-
-        // Count by uploader
-        files.forEach(file => {
-            const uploader = file.uploadedBy?.displayName || 'Unknown';
-            stats.byUploader[uploader] = (stats.byUploader[uploader] || 0) + 1;
-        });
-
-        return stats;
-    }, [files]);
-
-    // Get files uploaded by specific user
-    const getFilesByUser = useCallback((userId) => {
-        if (!userId) return [];
-        
-        return files.filter(file => file.uploadedBy?.id === userId);
-    }, [files]);
-
-    // Get files within date range
-    const getFilesByDateRange = useCallback((startDate, endDate) => {
-        if (!startDate || !endDate) return files;
-
-        return files.filter(file => {
-            const uploadDate = file.uploadedAt?.toDate?.() || new Date(file.uploadedAt);
-            return uploadDate >= startDate && uploadDate <= endDate;
-        });
-    }, [files]);
-
-    // Get large files (over specified size in bytes)
-    const getLargeFiles = useCallback((sizeThreshold = 10 * 1024 * 1024) => { // Default 10MB
-        return files.filter(file => (file.size || 0) > sizeThreshold);
-    }, [files]);
-
-    // Get duplicate files (same name and size)
-    const getDuplicateFiles = useCallback(() => {
-        const duplicates = [];
-        const seen = new Map();
-
-        files.forEach(file => {
-            const key = `${file.name}_${file.size}`;
-            if (seen.has(key)) {
-                const existing = seen.get(key);
-                if (!duplicates.find(group => group.includes(existing))) {
-                    duplicates.push([existing, file]);
-                } else {
-                    const group = duplicates.find(group => group.includes(existing));
-                    group.push(file);
-                }
-            } else {
-                seen.set(key, file);
-            }
-        });
-
-        return duplicates;
-    }, [files]);
-
-    // Export file list
-    const exportFileList = useCallback(() => {
-        const exportData = {
-            exportedAt: new Date().toISOString(),
-            channelId: channelId,
-            totalFiles: files.length,
-            files: files.map(file => ({
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                uploadedAt: file.uploadedAt?.toDate?.() || file.uploadedAt,
-                uploadedBy: file.uploadedBy?.displayName || 'Unknown',
-                messageId: file.messageId
-            }))
-        };
-
-        return exportData;
-    }, [files, channelId]);
-
-    // Bulk download files (creates a list for user to download individually)
-    const prepareBulkDownload = useCallback((fileIds) => {
-        if (!Array.isArray(fileIds) || fileIds.length === 0) {
-            throw new Error('Invalid file IDs provided');
-        }
-
-        const selectedFiles = files.filter(file => fileIds.includes(file.id));
-        
-        return {
-            files: selectedFiles,
-            totalSize: selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0),
-            downloadUrls: selectedFiles.map(file => ({
-                id: file.id,
-                name: file.name,
-                url: file.url || file.storageRef
-            }))
-        };
-    }, [files]);
-
     return {
-        // State
         files,
         loading,
         error,
-
-        // Core operations
         getChannelFiles,
-        downloadFile,
-        deleteFile,
-        canDeleteFile,
-
-        // Search and filter operations
         searchFiles,
         getFilesByType,
-        getFilesByUser,
-        getFilesByDateRange,
-
-        // Analysis operations
-        getFileStats,
-        getLargeFiles,
-        getDuplicateFiles,
-
-        // Utility operations
-        exportFileList,
-        prepareBulkDownload
+        downloadFile,
+        canDeleteFile,
+        deleteFile,
+        refetchChannelFiles: fetchChannelFiles // Expose refetch if needed
     };
 }; 

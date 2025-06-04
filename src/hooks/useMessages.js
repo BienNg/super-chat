@@ -1,639 +1,288 @@
 // src/hooks/useMessages.js
-import { useState, useEffect } from 'react';
-import { 
-    collection, 
-    query, 
-    orderBy, 
-    onSnapshot,
-    addDoc,
-    updateDoc,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    writeBatch,
-    arrayRemove,
-    serverTimestamp,
-    limit,
-    where
-} from 'firebase/firestore';
-import { getStorage, ref, deleteObject } from 'firebase/storage';
-import { db } from '../firebase';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import { logRealtimeListener, logFirebaseRead, logFirebaseWrite } from '../utils/comprehensiveFirebaseTracker';
+
+// Helper to convert Supabase timestamp to Date object
+const toDateSafe = (timestamp) => {
+    if (!timestamp) return null;
+    if (timestamp instanceof Date) return timestamp;
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? null : date;
+};
 
 export const useMessages = (channelId) => {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [deletingMessages, setDeletingMessages] = useState(new Set());
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [lastVisible, setLastVisible] = useState(null);
+    const [oldestMessageTimestamp, setOldestMessageTimestamp] = useState(null); // For pagination
+
+    const MESSAGES_PER_PAGE = 20; // Define how many messages to load per page
     
     const { currentUser, userProfile } = useAuth();
 
-    useEffect(() => {
-        if (!channelId) {
+    const fetchMessages = useCallback(async (isInitialLoad = false) => {
+        if (!channelId || !currentUser?.id) {
             setMessages([]);
             setLoading(false);
             setHasMoreMessages(true);
-            setLoadingMore(false);
+            setOldestMessageTimestamp(null);
             return;
         }
 
-        // Reset state for new channel
-        setMessages([]);
+        if (isInitialLoad) {
         setLoading(true);
+            setMessages([]); // Clear messages on initial load for a new channel
+            setOldestMessageTimestamp(null); // Reset pagination cursor
         setHasMoreMessages(true);
-        setLoadingMore(false);
-        
-        // Query messages in channel, ordered by timestamp (DESC to get latest messages)
-        // OPTIMIZATION: Reduced limit from 25 to 10 to minimize Firestore reads
-        const messagesQuery = query(
-            collection(db, 'channels', channelId, 'messages'),
-            orderBy('createdAt', 'desc'), // Changed to desc to get latest messages
-            limit(10) // Reduced for performance and quota management
-        );
+        } else {
+            setLoadingMore(true);
+        }
+        setError(null);
 
-        const unsubscribe = onSnapshot(
-            messagesQuery,
-            (snapshot) => {
-                // Log the Firebase read operation - THIS IS LIKELY YOUR HIGH USAGE SOURCE
-                logRealtimeListener('messages', snapshot.size, `Real-time messages listener for channel ${channelId}`);
-                
-                const messageData = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                
-                // Reverse to get chronological order (oldest first)
-                const newMessages = messageData.reverse();
-                
-                if (newMessages.length === 0) {
-                    setMessages([]);
-                    setLoading(false);
-                    setError(null);
-                    return;
-                }
+        try {
+            let query = supabase
+                .from('messages')
+                .select('*, author:profiles (*)') // Assuming 'profiles' table via user_id -> author_id
+                .eq('channel_id', channelId)
+                .order('created_at', { ascending: false }) // Fetch newest first
+                .limit(MESSAGES_PER_PAGE);
 
-                setMessages(prevMessages => {
-                    // If this is the first load, replace all messages
-                    if (prevMessages.length === 0) {
-                        return newMessages;
-                    }
-
-                    // For subsequent updates, we need to be more careful
-                    // The issue is that Firestore only returns the latest 10 messages
-                    // So we need to preserve older messages that were previously loaded
-                    
-                    // Find truly new messages (not in our current list)
-                    const existingMessageIds = new Set(prevMessages.map(msg => msg.id));
-                    const trulyNewMessages = newMessages.filter(msg => !existingMessageIds.has(msg.id));
-                    
-                    // Update existing messages (for edits, deletions, etc.)
-                    const updatedPrevMessages = prevMessages.map(prevMsg => {
-                        const updatedMsg = newMessages.find(newMsg => newMsg.id === prevMsg.id);
-                        return updatedMsg || prevMsg; // Keep original if not found in new data
-                    });
-                    
-                    // Only append truly new messages
-                    if (trulyNewMessages.length > 0) {
-                        return [...updatedPrevMessages, ...trulyNewMessages];
-                    }
-                    
-                    // If no new messages, just return updated existing messages
-                    return updatedPrevMessages;
-                });
-
-                setLoading(false);
-                setError(null);
-                
-                // Check if we have fewer messages than limit (means no more to load)
-                if (messageData.length < 10) {
-                    setHasMoreMessages(false);
-                }
-            },
-            (err) => {
-                // Log the error
-                logRealtimeListener('messages', 0, `Messages listener error for channel ${channelId}: ${err.message}`);
-                console.error('Error fetching messages:', err);
-                setError(err.message);
-                setLoading(false);
+            if (!isInitialLoad && oldestMessageTimestamp) {
+                query = query.lt('created_at', oldestMessageTimestamp); // Fetch messages older than the current oldest
             }
-        );
+            
+            const { data, error: fetchError } = await query;
+
+            if (fetchError) throw fetchError;
+
+            const fetchedMessages = (data || []).map(msg => ({
+                ...msg,
+                createdAt: toDateSafe(msg.created_at),
+                updatedAt: toDateSafe(msg.updated_at),
+                // Adapt author structure if different
+                author: msg.author ? { 
+                    id: msg.user_id, // or msg.author.id
+                    displayName: msg.author.display_name || msg.author.username, // Adjust to your profiles table
+                    avatar: msg.author.avatar_url 
+                } : { id: msg.user_id, displayName: 'Unknown User'}
+            })).reverse(); // Reverse to display oldest first in the array
+
+            if (fetchedMessages.length < MESSAGES_PER_PAGE) {
+                setHasMoreMessages(false);
+            }
+
+            if (fetchedMessages.length > 0) {
+                 // For pagination: store the timestamp of the oldest message fetched in this batch (which is the first after reverse)
+                // but since we fetched newest first, it's data[data.length-1].created_at before reverse
+                const oldestInBatchTimestamp = data[data.length-1].created_at;
+                if (isInitialLoad || new Date(oldestInBatchTimestamp) < new Date(oldestMessageTimestamp || '9999-12-31')) {
+                    setOldestMessageTimestamp(oldestInBatchTimestamp);
+                }
+            }
+
+
+            setMessages(prevMessages => {
+                if (isInitialLoad) return fetchedMessages;
+                // Prevent duplicates when loading more
+                const existingIds = new Set(prevMessages.map(m => m.id));
+                const newMessages = fetchedMessages.filter(m => !existingIds.has(m.id));
+                return [...newMessages, ...prevMessages]; // Prepend older messages
+            });
+
+        } catch (err) {
+            console.error('Error fetching messages:', err);
+            setError(err.message);
+        } finally {
+            if (isInitialLoad) setLoading(false);
+            setLoadingMore(false);
+        }
+    }, [channelId, currentUser?.id, oldestMessageTimestamp]);
+
+    // Initial fetch
+    useEffect(() => {
+        if (channelId && currentUser?.id) {
+            fetchMessages(true);
+        } else {
+            setMessages([]);
+            setLoading(false);
+            setHasMoreMessages(true);
+            setOldestMessageTimestamp(null);
+        }
+    }, [channelId, currentUser?.id]); // Removed fetchMessages from here to avoid loop, will be called by channelId/userId change
+
+    // Real-time subscriptions
+    useEffect(() => {
+        if (!channelId || !currentUser?.id) return;
+
+        const handleInserts = (payload) => {
+            // console.log('Message insert received:', payload.new);
+            const newMessage = {
+                ...payload.new,
+                createdAt: toDateSafe(payload.new.created_at),
+                updatedAt: toDateSafe(payload.new.updated_at),
+                 // TODO: Fetch author profile separately if not included in payload or handle missing
+                author: payload.new.user_id ? { id: payload.new.user_id, displayName: 'Loading User...' } : {displayName: 'Unknown User'}
+            };
+            // Ideally, fetch profile for author: supabase.from('profiles').select('*').eq('id', payload.new.user_id).single();
+
+            setMessages(prevMessages => {
+                if (prevMessages.find(m => m.id === newMessage.id)) return prevMessages; // Avoid duplicates
+                return [...prevMessages, newMessage].sort((a,b) => a.createdAt - b.createdAt);
+            });
+        };
+
+        const handleUpdates = (payload) => {
+            // console.log('Message update received:', payload.new);
+            const updatedMessage = {
+                ...payload.new,
+                createdAt: toDateSafe(payload.new.created_at),
+                updatedAt: toDateSafe(payload.new.updated_at),
+                // TODO: Fetch author profile if needed
+            };
+            setMessages(prevMessages => 
+                prevMessages.map(msg => msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg)
+                           .sort((a,b) => a.createdAt - b.createdAt)
+            );
+        };
+
+        const handleDeletes = (payload) => {
+            // console.log('Message delete received:', payload.old);
+            setMessages(prevMessages => prevMessages.filter(msg => msg.id !== payload.old.id));
+        };
+
+        const messagesSubscription = supabase
+            .channel(`public:messages:channel_id=eq.${channelId}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` }, handleInserts)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` }, handleUpdates)
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` }, handleDeletes)
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    // console.log('Subscribed to messages channel!');
+                    // Potentially refetch to ensure consistency after subscription
+                    // fetchMessages(true); // This might cause duplicate fetches, be careful
+                }
+            });
 
         return () => {
-            // Ensure proper cleanup of listener
-            unsubscribe();
+            supabase.removeChannel(messagesSubscription);
         };
-    }, [channelId]);
+    }, [channelId, currentUser?.id]);
+
 
     const sendMessage = async (content, attachments = []) => {
         if (!channelId || !currentUser || !content?.trim()) {
-            return;
+            // setError('Cannot send empty message or user not available.');
+            console.warn('Cannot send empty message, or user/channel not available.');
+            return null;
         }
 
         try {
+            setError(null);
             const messageData = {
                 content: content.trim(),
-                authorId: currentUser.uid,
-                author: {
-                    id: currentUser.uid,
-                    displayName: userProfile?.displayName || userProfile?.fullName || currentUser.displayName,
-                    email: currentUser.email,
-                    avatar: userProfile?.photo || null
-                },
-                attachments: attachments || [],
-                reactions: [],
-                replyCount: 0,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                deleted: false,
-                deletedAt: null,
-                deletedBy: null,
-                deletionType: null
+                user_id: currentUser.id, // Supabase uses user_id from auth typically
+                channel_id: channelId,
+                attachments: attachments || [], // Ensure this structure matches your DB (e.g., JSONB array of objects)
+                // reactions: [], // Default value if you have this column
+                // reply_count: 0, // Default value
+                // created_at will be set by Supabase by default (or use new Date().toISOString())
+                // updated_at will be set by Supabase by default
             };
 
-            await addDoc(collection(db, 'channels', channelId, 'messages'), messageData);
+            const { data: newMessage, error: insertError } = await supabase
+                .from('messages')
+                .insert(messageData)
+                .select('*, author:profiles(*)') // Fetch inserted message with author profile
+                .single();
+
+            if (insertError) throw insertError;
             
-            // Log the Firebase write operation
-            logFirebaseWrite('messages', `Message sent to channel ${channelId}`);
+            // The real-time listener should pick this up, so manual state update might not be needed
+            // or could lead to duplicates if not handled carefully.
+            // However, if you want optimistic updates or ensure immediate display:
+            /*
+            setMessages(prevMessages => [...prevMessages, {
+                ...newMessage,
+                createdAt: toDateSafe(newMessage.created_at),
+                updatedAt: toDateSafe(newMessage.updated_at),
+                author: newMessage.author ? { 
+                    id: newMessage.user_id, 
+                    displayName: newMessage.author.display_name || newMessage.author.username, 
+                    avatar: newMessage.author.avatar_url 
+                } : { id: newMessage.user_id, displayName: 'Current User'} // Placeholder if profile not immediately available
+            }].sort((a,b) => a.createdAt - b.createdAt));
+            */
+            return newMessage;
+
         } catch (error) {
-            // Log the error
-            logFirebaseWrite('messages', `Message send error for channel ${channelId}: ${error.message}`);
             console.error('Error sending message:', error);
-            throw error;
+            setError('Failed to send message: ' + error.message);
+            throw error; // Re-throw for the component to handle
         }
     };
 
-    // Permission check for message deletion
-    const canDeleteMessage = async (message) => {
-        if (!currentUser || !message) return false;
+    const loadMoreMessages = useCallback(() => {
+        if (loadingMore || !hasMoreMessages) return;
+        fetchMessages(false);
+    }, [loadingMore, hasMoreMessages, fetchMessages]);
 
-        // User can delete their own messages
-        if (message.authorId === currentUser.uid) return true;
+    // TODO: Refactor deleteMessage, editMessage, togglePinMessage, etc.
+    // These will require careful adaptation of permissions and Supabase client calls.
 
-        // Check if user is channel admin/moderator
-        try {
-            const channelDoc = await getDoc(doc(db, 'channels', channelId));
-            if (channelDoc.exists()) {
-                const channelData = channelDoc.data();
-                if (channelData.admins?.includes(currentUser.uid) || 
-                    channelData.moderators?.includes(currentUser.uid)) {
-                    return true;
-                }
-            }
-        } catch (error) {
-            console.error('Error checking channel permissions:', error);
-        }
-
-        // Check if user is system admin
-        if (userProfile?.role === 'admin') return true;
-
-        return false;
-    };
-
-    // Check if message is within edit window
-    const isWithinEditWindow = (message, editWindowMinutes = 15) => {
-        if (!message.createdAt) return false;
-        
-        const messageTime = message.createdAt.toDate();
-        const now = new Date();
-        const diffMinutes = (now - messageTime) / (1000 * 60);
-        
-        return diffMinutes <= editWindowMinutes;
-    };
-
-    // Check if message has replies
-    const hasReplies = async (messageId) => {
-        try {
-            const repliesQuery = query(
-                collection(db, 'channels', channelId, 'messages', messageId, 'replies'),
-                limit(1)
-            );
-            const repliesSnapshot = await getDocs(repliesQuery);
-            return !repliesSnapshot.empty;
-        } catch (error) {
-            console.error('Error checking replies:', error);
+    // Example: Basic structure for deleteMessage (needs more work)
+    const deleteMessage = async (messageId, // options = {} // softDelete, reason, etc.
+    ) => {
+        if (!currentUser || !messageId) {
+            setError("Cannot delete message: User or message ID missing.");
             return false;
         }
-    };
-
-    // Handle file attachments on deletion
-    const handleAttachmentsOnDelete = async (message, deleteType) => {
-        if (!message.attachments?.length || deleteType !== 'hard') return;
-
+        // setDeletingMessages(prev => new Set(prev).add(messageId)); // For UI
         try {
-            const storage = getStorage();
-            const deletePromises = message.attachments.map(attachment => {
-                if (attachment.storageRef) {
-                    return deleteObject(ref(storage, attachment.storageRef));
-                }
-                return null; // Return null for attachments without storageRef
-            }).filter(promise => promise !== null); // Filter out null values
+            setError(null);
+            // TODO: Permission check (canDeleteMessage adapted for Supabase)
+            // const hasPermission = await canDeleteMessageSupabase(messageId, currentUser, channelId);
+            // if (!hasPermission) throw new Error("You don't have permission to delete this message.");
+
+            // TODO: Handle attachments deletion from Supabase Storage
+            // const messageToDelete = messages.find(m => m.id === messageId);
+            // if (messageToDelete?.attachments?.length > 0) {
+            //    await handleSupabaseAttachmentsDelete(messageToDelete.attachments);
+            // }
             
-            await Promise.allSettled(deletePromises);
-        } catch (error) {
-            console.error('Error deleting attachments:', error);
-        }
-    };
+            const { error: deleteError } = await supabase
+                .from('messages')
+                .delete()
+                .eq('id', messageId);
 
-    // Handle pinned message removal
-    const handlePinnedMessageDeletion = async (messageId) => {
-        try {
-            const channelRef = doc(db, 'channels', channelId);
-            const channelDoc = await getDoc(channelRef);
+            if (deleteError) throw deleteError;
             
-            if (channelDoc.exists()) {
-                const pinnedMessages = channelDoc.data().pinnedMessages || [];
-                if (pinnedMessages.includes(messageId)) {
-                    await updateDoc(channelRef, {
-                        pinnedMessages: arrayRemove(messageId)
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error removing pinned message:', error);
-        }
-    };
-
-    // Handle reactions on deletion
-    const handleReactionsOnDelete = async (messageId, deleteType) => {
-        if (deleteType !== 'hard') return;
-
-        try {
-            const reactionsRef = collection(db, 'channels', channelId, 'messages', messageId, 'reactions');
-            const batch = writeBatch(db);
-            
-            const reactionsSnapshot = await getDocs(reactionsRef);
-            reactionsSnapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            
-            if (!reactionsSnapshot.empty) {
-                await batch.commit();
-            }
-        } catch (error) {
-            console.error('Error deleting reactions:', error);
-        }
-    };
-
-    // Edit message function
-    const editMessage = async (messageId, newContent) => {
-        if (!messageId || !channelId || !currentUser || !newContent?.trim()) {
-            throw new Error('Missing required parameters for message editing');
-        }
-
-        // Find the message
-        const message = messages.find(msg => msg.id === messageId);
-        if (!message) {
-            throw new Error('Message not found');
-        }
-
-        // Check if user can edit (only author can edit their own messages)
-        if (message.authorId !== currentUser.uid) {
-            throw new Error('You can only edit your own messages');
-        }
-
-        // Check if message is within edit window
-        if (!isWithinEditWindow(message)) {
-            throw new Error('Message can no longer be edited (15 minute window expired)');
-        }
-
-        try {
-            const messageRef = doc(db, 'channels', channelId, 'messages', messageId);
-            await updateDoc(messageRef, {
-                content: newContent.trim(),
-                editedAt: serverTimestamp(),
-                editedBy: currentUser.uid
-            });
-
-            // Log the Firebase write operation
-            logFirebaseWrite('messages', `Message edited in channel ${channelId}`);
-
-            return { success: true, messageId };
-        } catch (error) {
-            // Log the error
-            logFirebaseWrite('messages', `Message edit error in channel ${channelId}: ${error.message}`);
-            console.error('Error editing message:', error);
-            throw error;
-        }
-    };
-
-    // Pin/unpin message function
-    const togglePinMessage = async (messageId) => {
-        if (!messageId || !channelId || !currentUser) {
-            throw new Error('Missing required parameters for message pinning');
-        }
-
-        try {
-            const channelRef = doc(db, 'channels', channelId);
-            const channelDoc = await getDoc(channelRef);
-            
-            if (!channelDoc.exists()) {
-                throw new Error('Channel not found');
-            }
-
-            const channelData = channelDoc.data();
-            const pinnedMessages = channelData.pinnedMessages || [];
-            const isPinned = pinnedMessages.includes(messageId);
-
-            // Check permissions (admins, moderators, or message author)
-            const message = messages.find(msg => msg.id === messageId);
-            const canPin = message?.authorId === currentUser.uid ||
-                          channelData.admins?.includes(currentUser.uid) ||
-                          channelData.moderators?.includes(currentUser.uid) ||
-                          userProfile?.role === 'admin';
-
-            if (!canPin) {
-                throw new Error('You do not have permission to pin messages in this channel');
-            }
-
-            let updatedPinnedMessages;
-            if (isPinned) {
-                // Unpin message
-                updatedPinnedMessages = pinnedMessages.filter(id => id !== messageId);
-            } else {
-                // Pin message (limit to 50 pinned messages)
-                if (pinnedMessages.length >= 50) {
-                    throw new Error('Channel has reached the maximum number of pinned messages (50)');
-                }
-                updatedPinnedMessages = [...pinnedMessages, messageId];
-            }
-
-            await updateDoc(channelRef, {
-                pinnedMessages: updatedPinnedMessages,
-                lastPinnedAt: serverTimestamp(),
-                lastPinnedBy: currentUser.uid
-            });
-
-            return { 
-                success: true, 
-                messageId, 
-                isPinned: !isPinned,
-                pinnedCount: updatedPinnedMessages.length 
-            };
-
-        } catch (error) {
-            console.error('Error toggling pin message:', error);
-            throw error;
-        }
-    };
-
-    // Get pinned messages for channel
-    const getPinnedMessages = async () => {
-        if (!channelId) return [];
-
-        try {
-            const channelRef = doc(db, 'channels', channelId);
-            const channelDoc = await getDoc(channelRef);
-            
-            if (!channelDoc.exists()) {
-                return [];
-            }
-
-            const pinnedMessageIds = channelDoc.data().pinnedMessages || [];
-            
-            // Get the actual message data for pinned messages
-            const pinnedMessages = messages.filter(msg => 
-                pinnedMessageIds.includes(msg.id) && !msg.deleted
-            );
-
-            return pinnedMessages;
-        } catch (error) {
-            console.error('Error getting pinned messages:', error);
-            return [];
-        }
-    };
-
-    // Check if message is pinned
-    const isMessagePinned = async (messageId) => {
-        if (!channelId || !messageId) return false;
-
-        try {
-            const channelRef = doc(db, 'channels', channelId);
-            const channelDoc = await getDoc(channelRef);
-            
-            if (!channelDoc.exists()) {
-                return false;
-            }
-
-            const pinnedMessages = channelDoc.data().pinnedMessages || [];
-            return pinnedMessages.includes(messageId);
-        } catch (error) {
-            console.error('Error checking if message is pinned:', error);
+            // Real-time listener should remove it, or:
+            // setMessages(prev => prev.filter(m => m.id !== messageId));
+            return true;
+        } catch (err) {
+            console.error('Error deleting message:', err);
+            setError('Failed to delete message: ' + err.message);
             return false;
-        }
-    };
-
-    // Main delete message function
-    const deleteMessage = async (messageId, options = {}) => {
-        if (!messageId || !channelId || !currentUser) {
-            throw new Error('Missing required parameters for message deletion');
-        }
-
-        // Find the message
-        const message = messages.find(msg => msg.id === messageId);
-        if (!message) {
-            throw new Error('Message not found');
-        }
-
-        // Check permissions
-        const hasPermission = await canDeleteMessage(message);
-        if (!hasPermission) {
-            throw new Error('You do not have permission to delete this message');
-        }
-
-        // Check if already being deleted
-        if (deletingMessages.has(messageId)) {
-            throw new Error('Message is already being deleted');
-        }
-
-        setDeletingMessages(prev => new Set(prev).add(messageId));
-
-        try {
-            const messageRef = doc(db, 'channels', channelId, 'messages', messageId);
-            
-            // Determine deletion type
-            let deleteType = options.deleteType || 'soft';
-            
-            // Force soft delete if message has replies (unless explicitly overridden)
-            if (!options.forceHard) {
-                const messageHasReplies = await hasReplies(messageId);
-                if (messageHasReplies) {
-                    deleteType = 'soft';
-                }
-            }
-
-            // Check time window for regular users
-            const isOwnMessage = message.authorId === currentUser.uid;
-            const withinEditWindow = isWithinEditWindow(message);
-            
-            if (isOwnMessage && !withinEditWindow && !userProfile?.role === 'admin') {
-                throw new Error('You can only delete your own messages within 15 minutes of posting');
-            }
-
-            if (deleteType === 'soft') {
-                // Soft delete: mark as deleted but preserve data
-                await updateDoc(messageRef, {
-                    deleted: true,
-                    deletedAt: serverTimestamp(),
-                    deletedBy: currentUser.uid,
-                    deletionType: 'soft',
-                    deletionReason: options.reason || null
-                });
-                
-                // Log the Firebase write operation
-                logFirebaseWrite('messages', `Message soft deleted in channel ${channelId}`);
-            } else {
-                // Hard delete: remove completely
-                await handleAttachmentsOnDelete(message, 'hard');
-                await handleReactionsOnDelete(messageId, 'hard');
-                await handlePinnedMessageDeletion(messageId);
-                
-                // Delete the message document
-                await deleteDoc(messageRef);
-                
-                // Log the Firebase write operation
-                logFirebaseWrite('messages', `Message hard deleted in channel ${channelId}`);
-            }
-
-            return {
-                success: true,
-                deleteType,
-                messageId,
-                canUndo: deleteType === 'soft'
-            };
-
-        } catch (error) {
-            // Log the error
-            logFirebaseWrite('messages', `Message delete error in channel ${channelId}: ${error.message}`);
-            console.error('Error deleting message:', error);
-            throw error;
         } finally {
-            setDeletingMessages(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(messageId);
-                return newSet;
-            });
+            // setDeletingMessages(prev => { const s = new Set(prev); s.delete(messageId); return s; });
         }
     };
 
-    // Undo soft delete
-    const undoDeleteMessage = async (messageId) => {
-        if (!messageId || !channelId) {
-            throw new Error('Missing required parameters for undo');
-        }
-
-        try {
-            const messageRef = doc(db, 'channels', channelId, 'messages', messageId);
-            const messageDoc = await getDoc(messageRef);
-            
-            if (!messageDoc.exists()) {
-                throw new Error('Message not found');
-            }
-
-            const messageData = messageDoc.data();
-            if (!messageData.deleted || messageData.deletionType !== 'soft') {
-                throw new Error('Message cannot be restored');
-            }
-
-            // Check if user can undo (original author or admin)
-            const canUndo = messageData.authorId === currentUser.uid || 
-                           messageData.deletedBy === currentUser.uid ||
-                           userProfile?.role === 'admin';
-            
-            if (!canUndo) {
-                throw new Error('You do not have permission to restore this message');
-            }
-
-            await updateDoc(messageRef, {
-                deleted: false,
-                deletedAt: null,
-                deletedBy: null,
-                deletionType: null,
-                deletionReason: null,
-                restoredAt: serverTimestamp(),
-                restoredBy: currentUser.uid
-            });
-
-            return { success: true, messageId };
-
-        } catch (error) {
-            console.error('Error undoing message deletion:', error);
-            throw error;
-        }
-    };
-
-    // Load more messages (pagination)
-    const loadMoreMessages = async () => {
-        if (!channelId || !hasMoreMessages || loadingMore) return;
-
-        try {
-            setLoadingMore(true);
-            
-            // Get the oldest message timestamp for pagination
-            const oldestMessage = messages[0];
-            if (!oldestMessage) return;
-
-            const moreMessagesQuery = query(
-                collection(db, 'channels', channelId, 'messages'),
-                orderBy('createdAt', 'desc'),
-                where('createdAt', '<', oldestMessage.createdAt),
-                limit(10)
-            );
-
-            const snapshot = await getDocs(moreMessagesQuery);
-            
-            // Log the Firebase read operation
-            logFirebaseRead('messages', snapshot.size, `Load more messages for channel ${channelId}`);
-            
-            if (snapshot.empty) {
-                setHasMoreMessages(false);
-                return;
-            }
-
-            const moreMessages = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-
-            // Prepend to existing messages (since we're loading older ones)
-            setMessages(prev => [...moreMessages.reverse(), ...prev]);
-            
-            // Check if we've reached the beginning
-            if (snapshot.docs.length < 10) {
-                setHasMoreMessages(false);
-            }
-
-        } catch (error) {
-            // Log the error
-            logFirebaseRead('messages', 0, `Load more messages error for channel ${channelId}: ${error.message}`);
-            console.error('Error loading more messages:', error);
-            setError(error.message);
-        } finally {
-            setLoadingMore(false);
-        }
-    };
 
     return {
         messages,
         loading,
         error,
         sendMessage,
-        editMessage,
-        deleteMessage,
-        undoDeleteMessage,
-        canDeleteMessage,
-        isWithinEditWindow,
-        deletingMessages,
-        togglePinMessage,
-        getPinnedMessages,
-        isMessagePinned,
-        // Pagination functionality
+        loadMoreMessages,
         hasMoreMessages,
         loadingMore,
-        loadMoreMessages
+        deleteMessage, // Placeholder
+        // editMessage, // Placeholder
+        // togglePinMessage, // Placeholder
+        // ... other functions
     };
 };

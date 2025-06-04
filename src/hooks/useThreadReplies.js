@@ -1,17 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
-    collection, 
-    query, 
-    orderBy, 
-    onSnapshot,
-    addDoc,
-    serverTimestamp,
-    doc,
-    updateDoc,
-    increment,
-    limit
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useThreadReplies = (channelId, messageId) => {
@@ -30,35 +18,49 @@ export const useThreadReplies = (channelId, messageId) => {
 
         setLoading(true);
         
-        // Query replies for this message thread with a reasonable limit for performance
-        // OPTIMIZATION: Reduced limit from 50 to 25 to minimize Firestore reads
-        const repliesQuery = query(
-            collection(db, 'channels', channelId, 'messages', messageId, 'replies'),
-            orderBy('createdAt', 'asc'),
-            limit(25) // Reduced for performance and quota management
-        );
-
-        const unsubscribe = onSnapshot(
-            repliesQuery,
-            (snapshot) => {
-                const replyData = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+        // Initial fetch of replies
+        const fetchReplies = async () => {
+            try {
+                const { data, error: fetchError } = await supabase
+                    .from('message_replies')
+                    .select('*')
+                    .eq('parent_message_id', messageId)
+                    .order('created_at', { ascending: true })
+                    .limit(25);
                 
-                setReplies(replyData);
+                if (fetchError) throw fetchError;
+                
+                setReplies(data || []);
                 setLoading(false);
                 setError(null);
-            },
-            (err) => {
+            } catch (err) {
                 console.error('Error fetching thread replies:', err);
                 setError(err.message);
                 setLoading(false);
             }
-        );
+        };
+
+        fetchReplies();
+        
+        // Set up real-time subscription
+        const replySubscription = supabase
+            .channel(`message-replies-${messageId}`)
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'message_replies',
+                    filter: `parent_message_id=eq.${messageId}`
+                },
+                (payload) => {
+                    // Refresh the entire reply list when there's a change
+                    fetchReplies();
+                }
+            )
+            .subscribe();
 
         return () => {
-            unsubscribe();
+            supabase.removeChannel(replySubscription);
         };
     }, [channelId, messageId]);
 
@@ -68,40 +70,49 @@ export const useThreadReplies = (channelId, messageId) => {
         }
 
         try {
+            const timestamp = new Date().toISOString();
+            
             const replyData = {
                 content: content.trim(),
-                authorId: currentUser.uid,
-                author: {
-                    id: currentUser.uid,
-                    displayName: userProfile?.displayName || userProfile?.fullName || currentUser.displayName,
+                author_id: currentUser.id,
+                user_data: {
+                    id: currentUser.id,
+                    display_name: userProfile?.display_name || currentUser.email?.split('@')[0],
                     email: currentUser.email,
-                    avatar: userProfile?.photo || null
+                    avatar_url: userProfile?.avatar_url || null
                 },
-                parentMessageId: messageId,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
+                parent_message_id: messageId,
+                channel_id: channelId,
+                created_at: timestamp,
+                updated_at: timestamp
             };
 
-            // OPTIMIZATION: Add the reply (this is the only essential write)
-            await addDoc(collection(db, 'channels', channelId, 'messages', messageId, 'replies'), replyData);
+            // Add the reply
+            const { data: newReply, error: insertError } = await supabase
+                .from('message_replies')
+                .insert(replyData)
+                .select()
+                .single();
+                
+            if (insertError) throw insertError;
 
-            // OPTIMIZATION: Significantly reduced metadata updates to minimize writes
-            // Only update reply count every 5 replies to reduce write operations
-            const currentReplyCount = replies.length + 1; // +1 for the reply we just added
+            // Only update reply count for the first reply or every 5 replies
+            const currentReplyCount = replies.length + 1;
             const shouldUpdateCount = currentReplyCount % 5 === 0 || currentReplyCount === 1;
             
             if (shouldUpdateCount) {
-                const messageRef = doc(db, 'channels', channelId, 'messages', messageId);
-                await updateDoc(messageRef, {
-                    replyCount: increment(1),
-                    // REMOVED: lastThreadActivity - not essential for functionality
-                    // REMOVED: lastReply - not essential, can be computed from replies
-                });
+                const { error: updateError } = await supabase
+                    .from('messages')
+                    .update({ 
+                        reply_count: currentReplyCount,
+                        updated_at: timestamp
+                    })
+                    .eq('id', messageId);
+                
+                if (updateError) console.warn('Error updating message reply count:', updateError);
             }
             
-            // Note: Reply count in UI will be calculated from actual replies array length
-            // This ensures UI accuracy while reducing writes significantly
-
+            return newReply;
         } catch (error) {
             console.error('Error sending reply:', error);
             throw error;
@@ -113,8 +124,8 @@ export const useThreadReplies = (channelId, messageId) => {
         const participantMap = new Map();
         
         replies.forEach(reply => {
-            if (reply.author) {
-                participantMap.set(reply.author.id || reply.author.email, reply.author);
+            if (reply.user_data) {
+                participantMap.set(reply.user_data.id || reply.user_data.email, reply.user_data);
             }
         });
         

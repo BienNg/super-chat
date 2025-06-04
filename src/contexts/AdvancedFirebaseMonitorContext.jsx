@@ -1,13 +1,194 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import firebaseTracker, { startTracking, stopTracking, getStats, getRecentOperations } from '../utils/comprehensiveFirebaseTracker';
+import { supabase } from '../supabaseClient';
 import ManagerFirebaseDashboard from '../components/shared/ManagerFirebaseDashboard';
 import ProtectedComponent from '../components/shared/ProtectedComponent';
 
-const AdvancedFirebaseMonitorContext = createContext({});
+// Create a new context
+const AdvancedSupabaseMonitorContext = createContext({});
 
-export const useAdvancedFirebaseMonitor = () => useContext(AdvancedFirebaseMonitorContext);
+// Operations storage
+const operationsLog = [];
+let totalOperations = 0;
+let totalReads = 0;
+let totalWrites = 0;
+let startTime = null;
 
-export const AdvancedFirebaseMonitorProvider = ({ children }) => {
+// Custom hook to use the context
+export const useAdvancedSupabaseMonitor = () => useContext(AdvancedSupabaseMonitorContext);
+
+// Create a wrapper to intercept and log Supabase operations
+const trackSupabaseOperations = () => {
+  // Save original methods we want to track
+  const originalSelect = supabase.from;
+  const originalRpc = supabase.rpc;
+  const originalStorage = supabase.storage;
+  
+  // Track operations start time
+  startTime = new Date();
+
+  // Wrap Supabase query builder to track operations
+  supabase.from = function(...args) {
+    const queryBuilder = originalSelect.apply(this, args);
+    const table = args[0];
+    
+    // Create wrapped functions to track
+    const originalFunctions = {
+      select: queryBuilder.select,
+      insert: queryBuilder.insert,
+      update: queryBuilder.update,
+      upsert: queryBuilder.upsert,
+      delete: queryBuilder.delete,
+    };
+
+    // Wrap select (read operation)
+    queryBuilder.select = function(...selectArgs) {
+      const operation = {
+        id: ++totalOperations,
+        type: 'read',
+        method: 'select',
+        table,
+        timestamp: new Date(),
+        args: selectArgs
+      };
+      operationsLog.unshift(operation);
+      if (operationsLog.length > 200) operationsLog.pop();
+      totalReads++;
+      return originalFunctions.select.apply(this, selectArgs);
+    };
+    
+    // Wrap insert (write operation)
+    queryBuilder.insert = function(...insertArgs) {
+      const operation = {
+        id: ++totalOperations,
+        type: 'write',
+        method: 'insert',
+        table,
+        timestamp: new Date(),
+        args: insertArgs
+      };
+      operationsLog.unshift(operation);
+      if (operationsLog.length > 200) operationsLog.pop();
+      totalWrites++;
+      return originalFunctions.insert.apply(this, insertArgs);
+    };
+    
+    // Wrap update (write operation)
+    queryBuilder.update = function(...updateArgs) {
+      const operation = {
+        id: ++totalOperations,
+        type: 'write',
+        method: 'update',
+        table,
+        timestamp: new Date(),
+        args: updateArgs
+      };
+      operationsLog.unshift(operation);
+      if (operationsLog.length > 200) operationsLog.pop();
+      totalWrites++;
+      return originalFunctions.update.apply(this, updateArgs);
+    };
+    
+    // Wrap delete (write operation)
+    queryBuilder.delete = function(...deleteArgs) {
+      const operation = {
+        id: ++totalOperations,
+        type: 'write',
+        method: 'delete',
+        table,
+        timestamp: new Date(),
+        args: deleteArgs
+      };
+      operationsLog.unshift(operation);
+      if (operationsLog.length > 200) operationsLog.pop();
+      totalWrites++;
+      return originalFunctions.delete.apply(this, deleteArgs);
+    };
+    
+    // Wrap upsert (write operation)
+    queryBuilder.upsert = function(...upsertArgs) {
+      const operation = {
+        id: ++totalOperations,
+        type: 'write',
+        method: 'upsert',
+        table,
+        timestamp: new Date(),
+        args: upsertArgs
+      };
+      operationsLog.unshift(operation);
+      if (operationsLog.length > 200) operationsLog.pop();
+      totalWrites++;
+      return originalFunctions.upsert.apply(this, upsertArgs);
+    };
+    
+    return queryBuilder;
+  };
+  
+  return () => {
+    // Restore original methods when cleaning up
+    supabase.from = originalSelect;
+    supabase.rpc = originalRpc;
+    supabase.storage = originalStorage;
+  };
+};
+
+// Get stats from the operation log
+const getStats = () => {
+  const now = new Date();
+  const sessionDuration = startTime ? (now - startTime) / 1000 : 0; // in seconds
+  
+  // Calculate operations in the last 5 minutes
+  const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+  const recentOps = operationsLog.filter(op => op.timestamp >= fiveMinutesAgo);
+  const recentReads = recentOps.filter(op => op.type === 'read').length;
+  const recentWrites = recentOps.filter(op => op.type === 'write').length;
+  
+  const readsPerMinute = sessionDuration > 0 ? Math.round((recentReads / 5) * 10) / 10 : 0;
+  const writesPerMinute = sessionDuration > 0 ? Math.round((recentWrites / 5) * 10) / 10 : 0;
+  
+  // Generate alerts
+  const alerts = [];
+  if (readsPerMinute > 30) {
+    alerts.push({
+      type: 'warning',
+      message: 'High read rate detected',
+      details: `${readsPerMinute} reads/minute in the last 5 minutes`
+    });
+  }
+  
+  if (writesPerMinute > 15) {
+    alerts.push({
+      type: 'warning',
+      message: 'High write rate detected',
+      details: `${writesPerMinute} writes/minute in the last 5 minutes`
+    });
+  }
+  
+  return {
+    session: {
+      totalOperations,
+      totalReads,
+      totalWrites,
+      duration: Math.round(sessionDuration),
+      startTime
+    },
+    last5min: {
+      operations: recentOps.length,
+      reads: recentReads,
+      writes: recentWrites,
+      readsPerMinute,
+      writesPerMinute
+    },
+    alerts
+  };
+};
+
+// Get recent operations
+const getRecentOperations = (count = 50) => {
+  return operationsLog.slice(0, count);
+};
+
+// Provider component
+export const AdvancedSupabaseMonitorProvider = ({ children }) => {
   const [isTracking, setIsTracking] = useState(false);
   const [isDashboardVisible, setIsDashboardVisible] = useState(false);
   const [currentStats, setCurrentStats] = useState(null);
@@ -17,44 +198,16 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
   // Initialize tracking on mount
   useEffect(() => {
     if (!isInitialized) {
-      initializeTracking();
-      setIsInitialized(true);
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (isTracking) {
-        stopTracking();
-      }
-    };
-  }, []);
-
-  // Initialize comprehensive tracking
-  const initializeTracking = useCallback(() => {
-    try {
-      startTracking((operation) => {
-        // Update recent operations
-        setRecentOperations(prev => {
-          const updated = [operation, ...prev].slice(0, 100); // Keep last 100 operations
-          return updated;
-        });
-
-        // Update stats every few operations for performance
-        if (operation.id % 5 === 0) {
-          updateStats();
-        }
-      });
-
+      const cleanup = trackSupabaseOperations();
       setIsTracking(true);
-      console.log('✅ Advanced Firebase Monitor: Tracking initialized');
-
-      // Initial stats update
+      setIsInitialized(true);
+      
+      // Update stats once initially
       setTimeout(updateStats, 1000);
-
-    } catch (error) {
-      console.error('❌ Advanced Firebase Monitor: Failed to initialize', error);
+      
+      return cleanup;
     }
-  }, []);
+  }, [isInitialized]);
 
   // Update statistics
   const updateStats = useCallback(() => {
@@ -65,7 +218,7 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
       setCurrentStats(stats);
       setRecentOperations(operations);
     } catch (error) {
-      console.error('❌ Advanced Firebase Monitor: Failed to update stats', error);
+      console.error('Failed to update Supabase monitor stats:', error);
     }
   }, []);
 
@@ -89,7 +242,6 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
       totalOperations: session.totalOperations,
       totalReads: session.totalReads,
       totalWrites: session.totalWrites,
-      totalCost: session.totalCost,
       readsPerMinute: last5min.readsPerMinute,
       hasAlerts: alerts.length > 0,
       criticalAlerts: alerts.filter(a => a.type === 'warning').length,
@@ -123,11 +275,11 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `firebase-session-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `supabase-session-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
 
-    console.log('📊 Firebase Monitor: Session data exported');
+    console.log('📊 Supabase Monitor: Session data exported');
   }, [currentStats, recentOperations, getSessionSummary]);
 
   // Check if monitoring should show alert badge
@@ -169,7 +321,7 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
       status,
       color,
       reads: session.totalReads,
-      cost: session.totalCost,
+      writes: session.totalWrites,
       readsPerMinute: last5min.readsPerMinute
     };
   }, [currentStats]);
@@ -182,7 +334,7 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [isDashboardVisible, isTracking, updateStats]);
 
-  // Manager-friendly context value
+  // Context value
   const contextValue = {
     // Tracking state
     isTracking,
@@ -203,14 +355,11 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
     
     // Actions
     updateStats,
-    exportSessionData,
-    
-    // Direct tracker access (for advanced users)
-    tracker: firebaseTracker
+    exportSessionData
   };
 
   return (
-    <AdvancedFirebaseMonitorContext.Provider value={contextValue}>
+    <AdvancedSupabaseMonitorContext.Provider value={contextValue}>
       {children}
       
       {/* Render the manager dashboard - ONLY for admins */}
@@ -222,7 +371,7 @@ export const AdvancedFirebaseMonitorProvider = ({ children }) => {
           onToggle={toggleDashboard}
         />
       </ProtectedComponent>
-    </AdvancedFirebaseMonitorContext.Provider>
+    </AdvancedSupabaseMonitorContext.Provider>
   );
 };
 
@@ -235,7 +384,7 @@ export const useManagerDashboard = () => {
     getQuickStatus,
     shouldShowAlert,
     exportSessionData
-  } = useAdvancedFirebaseMonitor();
+  } = useAdvancedSupabaseMonitor();
 
   return {
     isDashboardVisible,
@@ -254,14 +403,14 @@ export const useDeveloperMonitor = () => {
     currentStats,
     recentOperations,
     updateStats,
-    tracker
-  } = useAdvancedFirebaseMonitor();
+    exportSessionData
+  } = useAdvancedSupabaseMonitor();
 
   return {
     isTracking,
     stats: currentStats,
     operations: recentOperations,
-    refresh: updateStats,
-    tracker
+    refreshStats: updateStats,
+    exportSessionData
   };
 }; 

@@ -1,17 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useStudentEnrollments = () => {
@@ -21,9 +9,9 @@ export const useStudentEnrollments = () => {
   
   const { currentUser } = useAuth();
 
-  // Fetch all enrollments from the new enrollments collection
+  // Fetch all enrollments from the enrollments table
   const fetchEnrollments = useCallback(async () => {
-    if (!currentUser?.uid) {
+    if (!currentUser?.id) {
       setEnrollments([]);
       setLoading(false);
       return;
@@ -33,30 +21,49 @@ export const useStudentEnrollments = () => {
       setLoading(true);
       setError(null);
       
-      // Query the new enrollments collection
-      const enrollmentsQuery = query(
-        collection(db, 'enrollments'),
-        orderBy('enrollmentDate', 'desc')
-      );
+      // Query the enrollments table
+      const { data, error: fetchError } = await supabase
+        .from('enrollments')
+        .select('*')
+        .order('enrollment_date', { ascending: false });
       
-      const snapshot = await getDocs(enrollmentsQuery);
-      const enrollmentsData = snapshot.docs.map(doc => ({
-        id: doc.id,
+      if (fetchError) throw fetchError;
+      
+      // Convert data to expected format
+      const enrollmentsData = data.map(enrollment => ({
+        id: enrollment.id,
         type: 'enrollment', // Distinguish from legacy data
-        ...doc.data(),
-        enrollmentDate: doc.data().enrollmentDate?.toDate?.() || new Date(),
-        createdAt: doc.data().createdAt?.toDate?.() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate?.() || new Date()
+        studentId: enrollment.student_id,
+        courseId: enrollment.course_id,
+        classId: enrollment.class_id,
+        studentName: enrollment.student_name,
+        studentEmail: enrollment.student_email,
+        courseName: enrollment.course_name,
+        courseLevel: enrollment.course_level,
+        className: enrollment.class_name,
+        status: enrollment.status,
+        progress: enrollment.progress,
+        attendance: enrollment.attendance,
+        amount: enrollment.amount,
+        currency: enrollment.currency,
+        paymentStatus: enrollment.payment_status,
+        notes: enrollment.notes,
+        avatar: enrollment.avatar,
+        avatarColor: enrollment.avatar_color,
+        enrollmentDate: new Date(enrollment.enrollment_date),
+        createdAt: new Date(enrollment.created_at),
+        updatedAt: new Date(enrollment.updated_at),
+        createdBy: enrollment.created_by
       }));
       
       setEnrollments(enrollmentsData);
     } catch (err) {
       console.error('Error fetching enrollments:', err);
-      setError('Failed to fetch enrollments');
+      setError('Failed to fetch enrollments: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.uid]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     fetchEnrollments();
@@ -90,18 +97,18 @@ export const useStudentEnrollments = () => {
     try {
       setError(null);
       
-      const timestamp = serverTimestamp();
+      const timestamp = new Date().toISOString();
       const newEnrollment = {
-        studentId: enrollmentData.studentId,
-        courseId: enrollmentData.courseId,
-        classId: enrollmentData.classId,
+        student_id: enrollmentData.studentId,
+        course_id: enrollmentData.courseId,
+        class_id: enrollmentData.classId,
         
         // Denormalized data for efficient queries
-        studentName: enrollmentData.studentName || enrollmentData.name,
-        studentEmail: enrollmentData.studentEmail || enrollmentData.email,
-        courseName: enrollmentData.courseName,
-        courseLevel: enrollmentData.courseLevel,
-        className: enrollmentData.className,
+        student_name: enrollmentData.studentName || enrollmentData.name,
+        student_email: enrollmentData.studentEmail || enrollmentData.email,
+        course_name: enrollmentData.courseName,
+        course_level: enrollmentData.courseLevel,
+        class_name: enrollmentData.className,
         
         // Enrollment details
         status: enrollmentData.status || 'active',
@@ -109,34 +116,44 @@ export const useStudentEnrollments = () => {
         attendance: enrollmentData.attendance || 0,
         amount: enrollmentData.amount || 0,
         currency: enrollmentData.currency || 'VND',
-        paymentStatus: enrollmentData.paymentStatus || 'pending',
+        payment_status: enrollmentData.paymentStatus || 'pending',
         notes: enrollmentData.notes || '',
         
         // Avatar data
         avatar: enrollmentData.avatar,
-        avatarColor: enrollmentData.avatarColor,
+        avatar_color: enrollmentData.avatarColor,
         
-        enrollmentDate: timestamp,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        createdBy: currentUser.uid
+        enrollment_date: timestamp,
+        created_at: timestamp,
+        updated_at: timestamp,
+        created_by: currentUser.id
       };
       
-      const docRef = await addDoc(collection(db, 'enrollments'), newEnrollment);
+      const { data: newRecord, error: insertError } = await supabase
+        .from('enrollments')
+        .insert(newEnrollment)
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
       
       // Add to local state immediately for better UX
       const enrollmentWithId = {
-        ...newEnrollment,
-        id: docRef.id,
+        ...enrollmentData,
+        id: newRecord.id,
         type: 'enrollment',
-        enrollmentDate: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
+        studentId: newRecord.student_id,
+        courseId: newRecord.course_id,
+        classId: newRecord.class_id,
+        enrollmentDate: new Date(newRecord.enrollment_date),
+        createdAt: new Date(newRecord.created_at),
+        updatedAt: new Date(newRecord.updated_at),
+        createdBy: newRecord.created_by
       };
       
       setEnrollments(prev => [enrollmentWithId, ...prev]);
       
-      return docRef.id;
+      return newRecord.id;
     } catch (err) {
       console.error('Error enrolling student:', err);
       setError(err.message || 'Failed to enroll student');
@@ -149,12 +166,25 @@ export const useStudentEnrollments = () => {
     try {
       setError(null);
       
+      // Convert keys to snake_case for Supabase
+      const convertedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+        // Convert camelCase to snake_case
+        const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+        acc[snakeKey] = value;
+        return acc;
+      }, {});
+      
       const updateData = {
-        ...updates,
-        updatedAt: serverTimestamp()
+        ...convertedUpdates,
+        updated_at: new Date().toISOString()
       };
 
-      await updateDoc(doc(db, 'enrollments', enrollmentId), updateData);
+      const { error: updateError } = await supabase
+        .from('enrollments')
+        .update(updateData)
+        .eq('id', enrollmentId);
+      
+      if (updateError) throw updateError;
       
       // Update local state
       setEnrollments(prev => prev.map(enrollment => 
@@ -164,7 +194,7 @@ export const useStudentEnrollments = () => {
       ));
     } catch (err) {
       console.error('Error updating enrollment:', err);
-      setError('Failed to update enrollment');
+      setError('Failed to update enrollment: ' + err.message);
       throw err;
     }
   };
@@ -173,13 +203,18 @@ export const useStudentEnrollments = () => {
   const removeEnrollment = async (enrollmentId) => {
     try {
       setError(null);
-      await deleteDoc(doc(db, 'enrollments', enrollmentId));
+      const { error: deleteError } = await supabase
+        .from('enrollments')
+        .delete()
+        .eq('id', enrollmentId);
+      
+      if (deleteError) throw deleteError;
       
       // Remove from local state
       setEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
     } catch (err) {
       console.error('Error removing enrollment:', err);
-      setError('Failed to remove enrollment');
+      setError('Failed to remove enrollment: ' + err.message);
       throw err;
     }
   };

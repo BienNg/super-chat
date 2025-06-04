@@ -28,7 +28,7 @@ import { db } from '../../firebase';
  * @param {string} props.placeholder - Placeholder text when no value is selected
  * @param {boolean} props.allowEditExisting - Whether to allow editing when the field already has a value (default: false)
  */
-const FirebaseCollectionSelector = ({
+const SupabaseCollectionSelector = ({
   collectionName,
   record,
   updateRecord,
@@ -281,4 +281,4 @@ const FirebaseCollectionSelector = ({
   );
 };
 
-export default FirebaseCollectionSelector; 
+export default SupabaseCollectionSelector; 

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../utils/supabaseClient';
 import { supabaseAuth } from '../utils/supabaseAuth';
 import { supabaseDb } from '../utils/supabaseDb';
@@ -12,6 +13,7 @@ export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     const signInWithEmail = (email, password) => {
         return supabaseAuth.signInWithEmail(email, password);
@@ -25,8 +27,18 @@ export const AuthProvider = ({ children }) => {
         return supabaseAuth.signInWithGoogle();
     };
 
-    const logout = () => {
-        return supabaseAuth.logout();
+    const logout = async () => {
+        console.log('Logout function in AuthContext called');
+        try {
+            const { error } = await supabaseAuth.logout();
+            if (error) {
+                console.error('Error logging out:', error);
+            } else {
+                navigate('/login', { replace: true });
+            }
+        } catch (error) {
+            console.error('Exception during logout:', error);
+        }
     };
 
     const createUserProfile = async (user, additionalData = {}) => {

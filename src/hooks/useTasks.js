@@ -1,19 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
-    collection, 
-    doc, 
-    addDoc, 
-    updateDoc, 
-    deleteDoc, 
-    onSnapshot, 
-    query, 
-    orderBy, 
-    serverTimestamp,
-    getDoc,
-    writeBatch,
-    setDoc
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -34,40 +20,62 @@ export const useTasks = (channelId) => {
 
         setLoading(true);
         
-        // Real-time listener for tasks in the channel
-        const tasksRef = collection(db, 'channels', channelId, 'tasks');
-        const tasksQuery = query(tasksRef, orderBy('lastActivity', 'desc'));
-        
-        const unsubscribe = onSnapshot(tasksQuery, 
-            (snapshot) => {
-                const tasksData = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setTasks(tasksData);
+        // Initial fetch of tasks in the channel
+        const fetchTasks = async () => {
+            try {
+                const { data, error: fetchError } = await supabase
+                    .from('channel_tasks')
+                    .select('*')
+                    .eq('channel_id', channelId)
+                    .order('last_activity', { ascending: false });
+                
+                if (fetchError) throw fetchError;
+                
+                setTasks(data || []);
                 setLoading(false);
                 setError(null);
-            },
-            (err) => {
+            } catch (err) {
                 console.error('Error fetching tasks:', err);
-                setError(err);
+                setError(err.message);
                 setLoading(false);
             }
-        );
+        };
+        
+        fetchTasks();
+
+        // Set up real-time subscription for tasks
+        const tasksSubscription = supabase
+            .channel(`channel-tasks-${channelId}`)
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'channel_tasks',
+                    filter: `channel_id=eq.${channelId}` 
+                },
+                (payload) => {
+                    // Refresh tasks when there's a change
+                    fetchTasks();
+                }
+            )
+            .subscribe();
 
         return () => {
             // Ensure proper cleanup to prevent memory leaks
-            unsubscribe();
+            supabase.removeChannel(tasksSubscription);
         };
     }, [channelId]);
 
     // Helper function to update task lastActivity
     const updateTaskLastActivity = async (taskId) => {
         try {
-            const taskRef = doc(db, 'channels', channelId, 'tasks', taskId);
-            await updateDoc(taskRef, {
-                lastActivity: serverTimestamp()
-            });
+            const timestamp = new Date().toISOString();
+            const { error: updateError } = await supabase
+                .from('channel_tasks')
+                .update({ last_activity: timestamp })
+                .eq('id', taskId);
+            
+            if (updateError) throw updateError;
         } catch (err) {
             console.error('Error updating task lastActivity:', err);
         }
@@ -81,121 +89,148 @@ export const useTasks = (channelId) => {
         try {
             setLoading(true);
             
-            const batch = writeBatch(db);
-            
-            // Create task document
-            const taskRef = doc(collection(db, 'channels', channelId, 'tasks'));
+            const timestamp = new Date().toISOString();
             
             // Extract sender information with proper fallbacks
-            const senderId = messageData.author?.id || messageData.authorId || currentUser.uid;
-            const senderDisplayName = messageData.author?.displayName || messageData.author?.email || currentUser.displayName || currentUser.email;
+            const senderId = messageData.author?.id || messageData.author_id || currentUser.id;
+            const senderDisplayName = messageData.author?.display_name || messageData.author?.email || userProfile.display_name || currentUser.email;
             const senderEmail = messageData.author?.email || currentUser.email;
             
+            // Create task data
             const taskData = {
-                id: taskRef.id,
-                sourceMessageId: messageId,
-                sourceMessageData: {
+                channel_id: channelId,
+                source_message_id: messageId,
+                source_message_data: {
                     content: messageData.content,
                     sender: {
-                        userId: senderId,
-                        displayName: senderDisplayName,
+                        user_id: senderId,
+                        display_name: senderDisplayName,
                         email: senderEmail,
                         avatar: messageData.author?.avatar || senderDisplayName?.charAt(0) || 'U',
-                        avatarColor: messageData.author?.avatarColor || 'bg-indigo-500'
+                        avatar_color: messageData.author?.avatar_color || 'bg-indigo-500'
                     },
-                    timestamp: messageData.timestamp || messageData.createdAt,
-                    replyCount: messageData.replyCount || 0
+                    timestamp: messageData.timestamp || messageData.created_at,
+                    reply_count: messageData.reply_count || 0
                 },
                 participants: [
                     {
-                        userId: currentUser.uid,
-                        displayName: userProfile?.fullName || currentUser.displayName || currentUser.email,
-                        addedAt: new Date(),
-                        addedBy: 'creator'
+                        user_id: currentUser.id,
+                        display_name: userProfile?.display_name || currentUser.email,
+                        added_at: timestamp,
+                        added_by: 'creator'
                     }
                 ],
-                createdAt: serverTimestamp(),
-                createdBy: currentUser.uid,
-                lastActivity: serverTimestamp(),
+                created_at: timestamp,
+                created_by: currentUser.id,
+                last_activity: timestamp,
                 status: 'active'
             };
             
-            batch.set(taskRef, taskData);
+            // Create the task in the database
+            const { data: newTask, error: taskError } = await supabase
+                .from('channel_tasks')
+                .insert(taskData)
+                .select()
+                .single();
+            
+            if (taskError) throw taskError;
             
             // Update the source message to mark it as a task
-            const messageRef = doc(db, 'channels', channelId, 'messages', messageId);
-            batch.update(messageRef, {
-                taskId: taskRef.id,
-                isTask: true
-            });
+            const { error: messageError } = await supabase
+                .from('messages')
+                .update({
+                    task_id: newTask.id,
+                    is_task: true,
+                    updated_at: timestamp
+                })
+                .eq('id', messageId);
             
-            await batch.commit();
+            if (messageError) throw messageError;
             
-            return { success: true, taskId: taskRef.id };
+            return { success: true, taskId: newTask.id };
         } catch (error) {
             console.error('Error creating task:', error);
             throw error;
+        } finally {
+            setLoading(false);
         }
     };
 
     const updateTaskParticipants = async (taskId, participants) => {
         try {
-            const taskRef = doc(db, 'channels', channelId, 'tasks', taskId);
-            await updateDoc(taskRef, {
-                participants,
-                lastActivity: serverTimestamp()
-            });
+            const timestamp = new Date().toISOString();
+            const { error: updateError } = await supabase
+                .from('channel_tasks')
+                .update({
+                    participants,
+                    last_activity: timestamp
+                })
+                .eq('id', taskId);
+            
+            if (updateError) throw updateError;
         } catch (err) {
             console.error('Error updating task participants:', err);
-            setError(err);
+            setError(err.message);
             throw err;
         }
     };
 
     const markTaskComplete = async (taskId) => {
         try {
-            const taskRef = doc(db, 'channels', channelId, 'tasks', taskId);
-            await updateDoc(taskRef, {
-                status: 'completed',
-                completedAt: serverTimestamp(),
-                completedBy: currentUser.uid,
-                lastActivity: serverTimestamp()
-            });
+            const timestamp = new Date().toISOString();
+            const { error: updateError } = await supabase
+                .from('channel_tasks')
+                .update({
+                    status: 'completed',
+                    completed_at: timestamp,
+                    completed_by: currentUser.id,
+                    last_activity: timestamp
+                })
+                .eq('id', taskId);
+            
+            if (updateError) throw updateError;
         } catch (err) {
             console.error('Error marking task complete:', err);
-            setError(err);
+            setError(err.message);
             throw err;
         }
     };
 
     const deleteTask = async (taskId) => {
         try {
-            const batch = writeBatch(db);
-            
             // Get task to find source message
-            const taskRef = doc(db, 'channels', channelId, 'tasks', taskId);
-            const taskDoc = await getDoc(taskRef);
+            const { data: task, error: taskFetchError } = await supabase
+                .from('channel_tasks')
+                .select('source_message_id')
+                .eq('id', taskId)
+                .single();
             
-            if (taskDoc.exists()) {
-                const taskData = taskDoc.data();
-                
+            if (taskFetchError && taskFetchError.code !== 'PGRST116') throw taskFetchError;
+            
+            if (task && task.source_message_id) {
                 // Remove task reference from source message
-                if (taskData.sourceMessageId) {
-                    const messageRef = doc(db, 'channels', channelId, 'messages', taskData.sourceMessageId);
-                    batch.update(messageRef, {
-                        taskId: null,
-                        isTask: false
-                    });
-                }
+                const { error: messageError } = await supabase
+                    .from('messages')
+                    .update({
+                        task_id: null,
+                        is_task: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', task.source_message_id);
                 
-                // Delete the task
-                batch.delete(taskRef);
-                
-                await batch.commit();
+                if (messageError) throw messageError;
             }
+            
+            // Delete the task
+            const { error: deleteError } = await supabase
+                .from('channel_tasks')
+                .delete()
+                .eq('id', taskId);
+            
+            if (deleteError) throw deleteError;
         } catch (err) {
             console.error('Error deleting task:', err);
-            setError(err);
+            setError(err.message);
             throw err;
         }
     };

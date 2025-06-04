@@ -3,51 +3,55 @@ import { supabase } from './supabaseClient';
 // Function to seed initial accounts data
 export const seedAccounts = async () => {
   try {
-    // Check if accounts already exist
-    const { data: existingAccounts, error: checkError } = await supabase
+    // Check if accounts table exists and is empty
+    const { error: checkError, count } = await supabase
       .from('accounts')
-      .select('id')
-      .limit(1);
-    
+      .select('id', { count: 'exact', head: true });
+
     if (checkError) {
-      console.error('Error checking accounts:', checkError);
-      return;
-    }
-    
-    // If accounts exist, don't seed
-    if (existingAccounts && existingAccounts.length > 0) {
-      return;
-    }
-    
-    console.log('Seeding accounts...');
-    
-    // Sample accounts data
-    const accountsData = [
-      {
-        name: 'Cash',
-        type: 'asset',
-        currency: 'USD',
-        is_default: true,
-        balance: 0
-      },
-      {
-        name: 'Bank Account',
-        type: 'asset',
-        currency: 'USD',
-        is_default: false,
-        balance: 0
+      if (checkError.code === '42P01') {
+        console.log('Accounts table does not exist. It should be created via migration scripts. Skipping seeding.');
+        return;
+      } else {
+        console.error('Error checking accounts table:', checkError);
+        return;
       }
-    ];
-    
-    // Insert accounts data
-    const { error: insertError } = await supabase
-      .from('accounts')
-      .insert(accountsData);
-    
-    if (insertError) {
-      console.error('Error seeding accounts:', insertError);
+    }
+
+    if (count === 0) {
+      console.log('Accounts table exists and is empty. Seeding accounts...');
+      // Sample accounts data
+      const accountsData = [
+        {
+          name: 'Cash',
+          type: 'asset',
+          currency: 'USD',
+          is_default: true,
+          balance: 0
+        },
+        {
+          name: 'Bank Account',
+          type: 'asset',
+          currency: 'USD',
+          is_default: false,
+          balance: 0
+        }
+      ];
+
+      // Insert accounts data
+      const { error: insertError } = await supabase
+        .from('accounts')
+        .insert(accountsData);
+
+      if (insertError) {
+        console.error('Error seeding accounts:', insertError);
+      } else {
+        console.log('Accounts seeded successfully!');
+      }
+    } else if (count > 0) {
+      console.log('Accounts table exists and has data. Skipping seeding.');
     } else {
-      console.log('Accounts seeded successfully!');
+      console.log('Could not determine account count or table is empty but count is not 0.');
     }
   } catch (error) {
     console.error('Exception in seedAccounts:', error);
@@ -57,55 +61,59 @@ export const seedAccounts = async () => {
 // Function to seed initial discounts data
 export const seedDiscounts = async () => {
   try {
-    // Check if discounts already exist
-    const { data: existingDiscounts, error: checkError } = await supabase
+    // Check if discounts table exists and is empty
+    const { error: checkError, count } = await supabase
       .from('discounts')
-      .select('id')
-      .limit(1);
-    
+      .select('id', { count: 'exact', head: true });
+
     if (checkError) {
-      console.error('Error checking discounts:', checkError);
-      return;
-    }
-    
-    // If discounts exist, don't seed
-    if (existingDiscounts && existingDiscounts.length > 0) {
-      return;
-    }
-    
-    console.log('Seeding discounts...');
-    
-    // Sample discounts data
-    const discountsData = [
-      {
-        name: 'Early Bird',
-        type: 'percentage',
-        value: 10,
-        is_active: true
-      },
-      {
-        name: 'Student',
-        type: 'percentage',
-        value: 15,
-        is_active: true
-      },
-      {
-        name: 'Referral',
-        type: 'fixed',
-        value: 50,
-        is_active: true
+      if (checkError.code === '42P01') {
+        console.log('Discounts table does not exist. It should be created via migration scripts. Skipping seeding.');
+        return;
+      } else {
+        console.error('Error checking discounts table:', checkError);
+        return;
       }
-    ];
-    
-    // Insert discounts data
-    const { error: insertError } = await supabase
-      .from('discounts')
-      .insert(discountsData);
-    
-    if (insertError) {
-      console.error('Error seeding discounts:', insertError);
+    }
+
+    if (count === 0) {
+      console.log('Discounts table exists and is empty. Seeding discounts...');
+      // Sample discounts data
+      const discountsData = [
+        {
+          name: 'Early Bird',
+          type: 'percentage',
+          value: 10,
+          is_active: true
+        },
+        {
+          name: 'Student',
+          type: 'percentage',
+          value: 15,
+          is_active: true
+        },
+        {
+          name: 'Referral',
+          type: 'fixed',
+          value: 50,
+          is_active: true
+        }
+      ];
+
+      // Insert discounts data
+      const { error: insertError } = await supabase
+        .from('discounts')
+        .insert(discountsData);
+
+      if (insertError) {
+        console.error('Error seeding discounts:', insertError);
+      } else {
+        console.log('Discounts seeded successfully!');
+      }
+    } else if (count > 0) {
+      console.log('Discounts table exists and has data. Skipping seeding.');
     } else {
-      console.log('Discounts seeded successfully!');
+      console.log('Could not determine discount count or table is empty but count is not 0.');
     }
   } catch (error) {
     console.error('Exception in seedDiscounts:', error);
@@ -203,27 +211,29 @@ export const seedCourseOptions = async () => {
 export const seedCategories = async () => {
   try {
     // Check if the categories table exists by trying to query it
-    const { error: checkError } = await supabase
+    const { data: existingData, error: checkError } = await supabase
       .from('categories')
-      .select('id')
-      .limit(1);
-    
-    // If we get a specific error about the table not existing, create it
-    if (checkError && checkError.code === '42P01') {
-      console.log('Categories table does not exist. Attempting to create it...');
-      
-      // Execute SQL to create the categories table
-      // Note: This requires create table permissions which might not be available
-      // in the current Supabase project settings
-      const { error: createError } = await supabase.rpc('create_categories_table');
-      
-      if (createError) {
-        console.error('Could not create categories table:', createError);
+      .select('id', { count: 'exact', head: true }); // Use head:true for a count
+
+    if (checkError) {
+      if (checkError.code === '42P01') {
+        console.log('Categories table does not exist. It should be created via migration scripts. Skipping seeding.');
+        return false; // Table doesn't exist, migrations should handle it.
+      } else {
+        // Another error occurred (e.g., RLS, network)
+        console.error('Error checking categories table:', checkError);
         return false;
       }
-      
-      console.log('Categories table created successfully!');
-      
+    }
+
+    // Table exists, check if it's empty
+    // existingData is null with head:true, but we can check the count from the response
+    const { count } = await supabase
+      .from('categories')
+      .select('id', { count: 'exact', head: true });
+
+    if (count === 0) {
+      console.log('Categories table exists and is empty. Seeding initial categories...');
       // Seed with initial categories
       const initialCategories = [
         { value: 'General' },
@@ -232,22 +242,26 @@ export const seedCategories = async () => {
         { value: 'Admin' },
         { value: 'Financial' }
       ];
-      
+
       const { error: insertError } = await supabase
         .from('categories')
         .insert(initialCategories);
-      
+
       if (insertError) {
         console.error('Error seeding initial categories:', insertError);
       } else {
         console.log('Initial categories seeded successfully!');
       }
-      
       return true;
+    } else if (count > 0) {
+      console.log('Categories table exists and has data. Skipping seeding.');
+      return false;
+    } else {
+      // This case should ideally not be reached if count is null or 0
+      console.log('Could not determine category count or table is empty but count is not 0.');
+      return false;
     }
-    
-    // If table exists or we got a different error, don't try to create it
-    return false;
+
   } catch (error) {
     console.error('Exception in seedCategories:', error);
     return false;
@@ -257,29 +271,23 @@ export const seedCategories = async () => {
 // Function to create the channels table if it doesn't exist
 export const seedChannels = async () => {
   try {
-    // Check if the channels table exists by trying to query it
-    const { error: checkError } = await supabase
+    // Check if channels table exists and is empty
+    const { error: checkError, count } = await supabase
       .from('channels')
-      .select('id')
-      .limit(1);
-    
-    // If we get a specific error about the table not existing, create it
-    if (checkError && checkError.code === '42P01') {
-      console.log('Channels table does not exist. Attempting to create it...');
-      
-      // Execute SQL to create the channels table
-      // Note: This requires create table permissions which might not be available
-      // in the current Supabase project settings
-      const { error: createError } = await supabase.rpc('create_channels_table');
-      
-      if (createError) {
-        console.error('Could not create channels table:', createError);
+      .select('id', { count: 'exact', head: true });
+
+    if (checkError) {
+      if (checkError.code === '42P01') {
+        console.log('Channels table does not exist. It should be created via migration scripts. Skipping seeding.');
+        return false;
+      } else {
+        console.error('Error checking channels table:', checkError);
         return false;
       }
-      
-      console.log('Channels table created successfully!');
-      
-      // Seed with initial general channel
+    }
+
+    if (count === 0) {
+      console.log('Channels table exists and is empty. Seeding initial general channel...');
       const { error: insertError } = await supabase
         .from('channels')
         .insert({
@@ -291,18 +299,20 @@ export const seedChannels = async () => {
             notifications: true
           }
         });
-      
+
       if (insertError) {
         console.error('Error seeding initial general channel:', insertError);
       } else {
         console.log('Initial general channel seeded successfully!');
       }
-      
       return true;
+    } else if (count > 0) {
+      console.log('Channels table exists and has data. Skipping seeding general channel.');
+      return false;
+    } else {
+      console.log('Could not determine channel count or table is empty but count is not 0.');
+      return false;
     }
-    
-    // If table exists or we got a different error, don't try to create it
-    return false;
   } catch (error) {
     console.error('Exception in seedChannels:', error);
     return false;

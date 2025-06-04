@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 // Hooks
 import { useChannels } from '../../hooks/useChannels';
 import { useMessages } from '../../hooks/useMessages';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { useThread } from '../../contexts/ThreadContext';
 
 // Layout components

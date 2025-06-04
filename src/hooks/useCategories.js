@@ -4,12 +4,10 @@ import { supabase } from '../utils/supabaseClient';
 /**
  * IMPORTANT: This hook requires a 'categories' table in your Supabase database.
  * 
- * If you're seeing errors about the 'categories' table not existing, you need to:
- * 1. Go to the SQL editor in your Supabase dashboard
- * 2. Copy and execute the SQL in /sql/create_categories_table.sql
- * 3. This will create the stored procedure
- * 4. Then you can call this procedure in your app code or directly via SQL:
- *    SELECT create_categories_table();
+ * If you're seeing errors about the 'categories' table not existing, you need to
+ * ensure that your database migrations (e.g., located in the 'migration'
+ * directory) have been run. The 'categories' table should be defined in a
+ * migration file like 'supabase-crm-migration.sql' or similar.
  * 
  * The hook will use default categories when the table doesn't exist to avoid app crashes.
  */
