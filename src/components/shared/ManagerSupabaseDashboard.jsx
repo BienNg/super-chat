@@ -4,9 +4,9 @@ import {
   Clock, Database, Users, MessageCircle, Eye, EyeOff, RefreshCw,
   CheckCircle, AlertCircle, Info, Download, BarChart3, Zap
 } from 'lucide-react';
-import { getRecentOperations, getStats } from '../../utils/comprehensiveFirebaseTracker';
+import { getRecentOperations, getStats } from '../../utils/comprehensiveSupabaseTracker';
 
-const ManagerFirebaseDashboard = ({ stats, recentOperations, isVisible, onToggle }) => {
+const ManagerSupabaseDashboard = ({ stats, recentOperations, isVisible, onToggle }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
@@ -944,4 +944,4 @@ const getAlertStyle = (type) => {
   return styles[type] || styles.info;
 };
 
-export default ManagerFirebaseDashboard; 
+export default ManagerSupabaseDashboard; 

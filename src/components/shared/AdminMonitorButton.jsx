@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useDeveloperMonitor } from '../../contexts/AdvancedFirebaseMonitorContext';
+import { useDeveloperMonitor } from '../../contexts/AdvancedSupabaseMonitorContext';
 
 const AdminMonitorButton = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -46,7 +46,7 @@ const AdminMonitorButton = () => {
           <div className="max-h-32 overflow-y-auto space-y-1">
             {operations.slice(0, 5).map((op) => (
               <div key={op.id} className="text-xs text-gray-500">
-                {op.type} on {op.collection}
+                {op.type} on {op.table || op.collection}
               </div>
             ))}
           </div>

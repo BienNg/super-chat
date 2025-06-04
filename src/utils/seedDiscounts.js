@@ -1,69 +1,72 @@
-import { collection, addDoc, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
-import { logFirebaseRead, logFirebaseWrite } from './comprehensiveFirebaseTracker';
+import { supabase } from './supabaseClient';
 
 const defaultDiscounts = [
   {
     name: 'Student Discount',
     type: 'percentage',
     value: 10,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     name: 'Early Bird',
     type: 'percentage',
     value: 15,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     name: 'Loyalty Discount',
     type: 'percentage',
     value: 20,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     name: 'Group Discount',
     type: 'percentage',
     value: 25,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     name: 'Seasonal Promotion',
     type: 'fixed_amount',
     value: 50,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
 export const seedDiscounts = async () => {
   try {
     // Check if discounts already exist
-    const discountsRef = collection(db, 'discounts');
-    const snapshot = await getDocs(discountsRef);
+    const { data, error, count } = await supabase
+      .from('discounts')
+      .select('*', { count: 'exact', head: true });
     
-    // Log the Firebase read operation
-    logFirebaseRead('discounts', snapshot.size, 'Check if discounts collection needs seeding');
+    if (error) {
+      console.error('Error checking discounts table:', error);
+      return;
+    }
     
-    if (snapshot.empty) {
-      console.log('Seeding discounts collection...');
+    console.log(`Checking discounts table, found ${count} records`);
+    
+    if (count === 0) {
+      console.log('Seeding discounts table...');
       
-      for (const discount of defaultDiscounts) {
-        await addDoc(discountsRef, discount);
-        
-        // Log the Firebase write operation
-        logFirebaseWrite('discounts', `Seeded discount: ${discount.name}`);
-        
-        console.log(`Added discount: ${discount.name}`);
+      const { error: insertError } = await supabase
+        .from('discounts')
+        .insert(defaultDiscounts);
+      
+      if (insertError) {
+        console.error('Error seeding discounts:', insertError);
+        return;
       }
       
       console.log('Discounts seeded successfully!');
     } else {
-      console.log('Discounts collection already has data, skipping seed.');
+      console.log('Discounts table already has data, skipping seed.');
     }
   } catch (error) {
     console.error('Error seeding discounts:', error);

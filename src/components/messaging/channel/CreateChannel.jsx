@@ -1,6 +1,6 @@
 // src/components/CreateChannel.jsx
 import React, { useState } from 'react';
-import { X, Hash, Lock } from 'lucide-react';
+import { X, Hash, Lock, ChevronDown } from 'lucide-react';
 import { supabase } from '../../../supabaseClient';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useChannelClassSync } from '../../../hooks/useChannelClassSync';

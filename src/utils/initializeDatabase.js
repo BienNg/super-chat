@@ -1,5 +1,4 @@
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from './supabaseClient';
 
 // Default data for all collections
 const defaultData = {
@@ -159,34 +158,44 @@ const sampleStudents = [
 ];
 
 // Helper function to check if data already exists
-const checkIfDataExists = async (collectionName) => {
-  const snapshot = await getDocs(collection(db, collectionName));
-  return !snapshot.empty;
+const checkIfDataExists = async (tableName) => {
+  const { count } = await supabase
+    .from(tableName)
+    .select('*', { count: 'exact', head: true });
+  return count > 0;
 };
 
 // Helper function to add data to a collection
-const addDataToCollection = async (collectionName, data) => {
-  console.log(`Adding data to ${collectionName}...`);
+const addDataToCollection = async (tableName, data) => {
+  console.log(`Adding data to ${tableName}...`);
   
   for (const item of data) {
     try {
       if (typeof item === 'string') {
         // For simple string values (options)
-        await addDoc(collection(db, collectionName), { value: item });
+        const { error } = await supabase
+          .from(tableName)
+          .insert({ value: item });
+        
+        if (error) throw error;
       } else {
         // For complex objects (students)
-        await addDoc(collection(db, collectionName), {
-          ...item,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
+        const { error } = await supabase
+          .from(tableName)
+          .insert({
+            ...item,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (error) throw error;
       }
     } catch (error) {
-      console.error(`Error adding ${item} to ${collectionName}:`, error);
+      console.error(`Error adding ${item} to ${tableName}:`, error);
     }
   }
   
-  console.log(`✅ ${collectionName} data added successfully`);
+  console.log(`✅ ${tableName} data added successfully`);
 };
 
 // Main initialization function
@@ -195,13 +204,13 @@ export const initializeDatabase = async () => {
   
   try {
     // Initialize option collections
-    for (const [collectionName, data] of Object.entries(defaultData)) {
-      const exists = await checkIfDataExists(collectionName);
+    for (const [tableName, data] of Object.entries(defaultData)) {
+      const exists = await checkIfDataExists(tableName);
       
       if (!exists) {
-        await addDataToCollection(collectionName, data);
+        await addDataToCollection(tableName, data);
       } else {
-        console.log(`⏭️  ${collectionName} already has data, skipping...`);
+        console.log(`⏭️  ${tableName} already has data, skipping...`);
       }
     }
     
@@ -226,16 +235,34 @@ export const initializeDatabase = async () => {
 export const resetDatabase = async () => {
   console.log('⚠️  Resetting database...');
   
-  const collections = ['categories', 'courseInterests', 'platforms', 'countries', 'cities', 'students'];
+  const tables = ['categories', 'course_interests', 'platforms', 'countries', 'cities', 'students'];
   
-  for (const collectionName of collections) {
+  for (const tableName of tables) {
     try {
-      const snapshot = await getDocs(collection(db, collectionName));
-      const deletePromises = snapshot.docs.map(doc => doc.ref.delete());
-      await Promise.all(deletePromises);
-      console.log(`🗑️  ${collectionName} collection cleared`);
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .is('id', null)
+        .eq('id', 'none'); // This is a safe way to delete no records
+      
+      if (error) {
+        console.error(`Error clearing ${tableName}:`, error);
+        continue;
+      }
+      
+      // Delete all records
+      const { error: deleteError } = await supabase
+        .from(tableName)
+        .delete()
+        .not('id', 'is', null);
+      
+      if (deleteError) {
+        console.error(`Error clearing ${tableName}:`, deleteError);
+      } else {
+        console.log(`🗑️  ${tableName} table cleared`);
+      }
     } catch (error) {
-      console.error(`Error clearing ${collectionName}:`, error);
+      console.error(`Error clearing ${tableName}:`, error);
     }
   }
   

@@ -1,4 +1,4 @@
-import { db } from '../firebase';
+import { supabase } from '../supabaseClient';
 
 // Clean up any old Firebase function overrides
 const cleanupOldFirebaseOverrides = () => {
@@ -87,11 +87,11 @@ const OPERATION_CATEGORIES = {
   }
 };
 
-// Cost calculation (approximate Firebase pricing)
-const COST_PER_READ = 0.00036; // $0.36 per 100K reads
-const COST_PER_WRITE = 0.0018; // $1.80 per 100K writes
+// Cost calculation (approximate Supabase pricing)
+const COST_PER_READ = 0.0001; // Supabase has more generous pricing
+const COST_PER_WRITE = 0.0005; // Supabase has more generous pricing
 
-class FirebaseOperationTracker {
+class SupabaseOperationTracker {
   constructor() {
     this.operations = [];
     this.realtimeListeners = new Map();
@@ -1077,7 +1077,7 @@ class FirebaseOperationTracker {
 }
 
 // Global instance
-const tracker = new FirebaseOperationTracker();
+const tracker = new SupabaseOperationTracker();
 
 // Auto-initialize tracking as soon as this module is imported
 // This ensures we capture early Firebase operations like authentication and seeding

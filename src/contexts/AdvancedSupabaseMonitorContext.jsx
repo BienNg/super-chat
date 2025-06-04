@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import ManagerFirebaseDashboard from '../components/shared/ManagerFirebaseDashboard';
+import ManagerSupabaseDashboard from '../components/shared/ManagerSupabaseDashboard';
 import ProtectedComponent from '../components/shared/ProtectedComponent';
+
+// Note: Keeping AdvancedSupabaseMonitorContext name to avoid breaking existing imports
 
 // Create a new context
 const AdvancedSupabaseMonitorContext = createContext({});
@@ -21,7 +23,6 @@ const trackSupabaseOperations = () => {
   // Save original methods we want to track
   const originalSelect = supabase.from;
   const originalRpc = supabase.rpc;
-  const originalStorage = supabase.storage;
   
   // Track operations start time
   startTime = new Date();
@@ -127,7 +128,6 @@ const trackSupabaseOperations = () => {
     // Restore original methods when cleaning up
     supabase.from = originalSelect;
     supabase.rpc = originalRpc;
-    supabase.storage = originalStorage;
   };
 };
 
@@ -364,7 +364,7 @@ export const AdvancedSupabaseMonitorProvider = ({ children }) => {
       
       {/* Render the manager dashboard - ONLY for admins */}
       <ProtectedComponent roles={['admin']}>
-        <ManagerFirebaseDashboard
+        <ManagerSupabaseDashboard
           stats={currentStats}
           recentOperations={recentOperations}
           isVisible={isDashboardVisible}
@@ -395,6 +395,9 @@ export const useManagerDashboard = () => {
     exportSessionData
   };
 };
+
+// Hook for firebase compatibility
+export const useManagerFirebaseMonitor = useManagerDashboard;
 
 // Hook for developers who need technical access
 export const useDeveloperMonitor = () => {

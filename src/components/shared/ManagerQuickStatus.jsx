@@ -1,10 +1,10 @@
 import React from 'react';
 import { Activity, AlertTriangle, DollarSign, Database } from 'lucide-react';
-import { useManagerDashboard } from '../../contexts/AdvancedFirebaseMonitorContext';
+import { useAdvancedSupabaseMonitor } from '../../contexts/AdvancedSupabaseMonitorContext';
 import { usePermissions } from '../../hooks/usePermissions';
 
 const ManagerQuickStatus = () => {
-  const { quickStatus, hasAlerts, toggleDashboard } = useManagerDashboard();
+  const { quickStatus, hasAlerts, toggleDashboard } = useAdvancedSupabaseMonitor();
   const { isAdmin } = usePermissions();
 
   // Only render for admins
