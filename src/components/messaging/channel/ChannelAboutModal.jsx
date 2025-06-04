@@ -22,7 +22,8 @@ import {
     AlertCircle,
     Check
 } from 'lucide-react';
-import { supabase } from '../../../supabaseClient';
+import { doc, updateDoc, serverTimestamp, query, where, getDocs, collection } from 'firebase/firestore';
+import { db } from '../../../firebase';
 import { useChannelManagement } from '../../../hooks/useChannelManagement';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useChannelClassSync } from '../../../hooks/useChannelClassSync';
@@ -125,22 +126,21 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
             setUpdating(true);
             const oldType = channel.type;
             
-            const { error: updateError } = await supabase
-                .from('channels')
-                .update({ 
-                    type: selectedType,
-                    updated_at: new Date().toISOString() 
-                })
-                .eq('id', channel.id);
-
-            if (updateError) throw updateError;
+            // Update channel type in database
+            const channelRef = doc(db, 'channels', channel.id);
+            await updateDoc(channelRef, {
+                type: selectedType,
+                updatedAt: serverTimestamp()
+            });
             
+            // Handle class creation/archiving based on type change
             await handleChannelTypeChange(channel.id, selectedType, oldType, channel.name);
             
             setEditingType(false);
-            onUpdate?.();
+            onUpdate?.(); // Notify parent component to refresh
         } catch (error) {
             console.error('Failed to update channel type:', error);
+            // Reset to original value on error
             setSelectedType(channel?.type || 'general');
         } finally {
             setUpdating(false);
@@ -156,20 +156,22 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
     const handleAddMember = async (userId) => {
         try {
             await addMemberToChannel(channel.id, userId, channel.name);
-            await loadUsers();
-            onUpdate?.();
+            await loadUsers(); // Refresh the user lists
+            onUpdate?.(); // Notify parent component to refresh
         } catch (error) {
             console.error('Failed to add member:', error);
+            // TODO: Show error toast
         }
     };
 
     const handleRemoveMember = async (userId) => {
         try {
             await removeMemberFromChannel(channel.id, userId, channel.name);
-            await loadUsers();
-            onUpdate?.();
+            await loadUsers(); // Refresh the user lists
+            onUpdate?.(); // Notify parent component to refresh
         } catch (error) {
             console.error('Failed to remove member:', error);
+            // TODO: Show error toast
         }
     };
 
@@ -177,6 +179,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
         if (selectedUsersToAdd.length === 0) return;
         
         try {
+            // Add members one by one to ensure proper notifications
             for (const userId of selectedUsersToAdd) {
                 await addMemberToChannel(channel.id, userId, channel.name);
             }
@@ -187,6 +190,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
             onUpdate?.();
         } catch (error) {
             console.error('Failed to add members:', error);
+            // TODO: Show error toast
         }
     };
 
@@ -209,11 +213,13 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
     );
 
     const getStatusColor = (userId) => {
+        // Simple status simulation - in real app, you'd track this in Firebase
         const colors = ['bg-green-500', 'bg-yellow-500', 'bg-gray-400'];
         return colors[userId.length % 3];
     };
 
     const getLastSeen = (userId) => {
+        // Simple last seen simulation - in real app, you'd track this in Firebase
         const options = ['Active now', '5m ago', '1h ago', '2h ago'];
         return options[userId.length % 4];
     };
@@ -235,6 +241,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
     };
 
     const canManageMembers = () => {
+        // Allow everyone to add members - no restrictions
         return true;
     };
 
@@ -243,131 +250,169 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
             await deleteChannel(channel.id, channel.name);
             setShowDeleteModal(false);
             onClose();
-            onChannelDeleted?.(channel.id);
+            // Notify parent component that channel was deleted
+            if (onChannelDeleted) {
+                onChannelDeleted(channel.id);
+            }
         } catch (error) {
-            console.error('Failed to delete channel:', error);
+            // Error will be handled by the DeleteChannelModal
+            throw error;
         }
     };
 
-    const canDeleteThisChannel = () => {
-        return canDeleteChannelUtil(channel, userProfile);
+    // Check if current user can delete the channel
+    const canDeleteChannel = () => {
+        if (!userProfile || !channel) return false;
+        
+        // Channel creator can always delete
+        if (channel.createdBy === userProfile.id) return true;
+        
+        // Channel admins can delete
+        if (channel.admins?.includes(userProfile.id)) return true;
+        
+        // Use role-based permissions
+        if (canDeleteChannelUtil(userProfile.roles)) return true;
+        
+        return false;
     };
 
     const getCurrentChannelType = () => {
-        return channelTypes.find(t => t.id === selectedType) || channelTypes[0];
+        return channelTypes.find(t => t.id === (channel.type || 'general')) || channelTypes[0];
     };
 
     const formatCreatedDate = (timestamp) => {
-        if (!timestamp) return 'N/A';
-        const date = new Date(timestamp);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        if (!timestamp) return 'Unknown date';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        return date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
     };
 
+    // Render format/location for class channels
     const renderClassMeta = () => {
-        if (selectedType !== 'class' || !classInfo) return null;
+        if (channel.type !== 'class' || !classInfo) return null;
+        if (!classInfo.format && !classInfo.formatOption) return null;
         return (
-            <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Class Details</h4>
-                <p className="text-xs text-gray-600">Level: {classInfo.level || 'N/A'}</p>
-                <p className="text-xs text-gray-600">Teachers: {classInfo.teachers?.join(', ') || 'N/A'}</p>
-            </div>
+            <span className="flex items-center ml-2 gap-1 text-gray-100 text-xs">
+                <Globe className="w-3 h-3 text-indigo-200 mr-1" />
+                <span className="font-semibold">{classInfo.format}</span>
+                {classInfo.format && classInfo.formatOption && <span className="mx-1">·</span>}
+                {classInfo.formatOption && <span>{classInfo.formatOption}</span>}
+            </span>
         );
     };
 
+    // Function to check if channel name already exists (excluding current channel)
     const checkChannelNameExists = async (channelName) => {
-        if (!channelName) return false;
         try {
-            const { data, error } = await supabase
-                .from('channels')
-                .select('id')
-                .eq('name', channelName.trim())
-                .neq('id', channel.id)
-                .maybeSingle();
-
-            if (error && error.code !== 'PGRST116') {
-                console.error('Error checking channel name:', error);
-                return false;
-            }
-            return !!data;
+            const channelsRef = collection(db, 'channels');
+            const q = query(channelsRef, where('name', '==', channelName.trim()));
+            const snapshot = await getDocs(q);
+            
+            // Check if any found channel is different from current channel
+            return snapshot.docs.some(doc => doc.id !== channel.id);
         } catch (error) {
-            console.error('Error checking channel name existence:', error);
-            return false;
+            console.error('Error checking channel name:', error);
+            throw new Error('Unable to verify channel name availability');
         }
     };
 
+    // Handle channel name update
     const handleUpdateChannelName = async () => {
-        const newName = tempChannelName.trim();
-        if (!newName) {
-            setNameError('Channel name cannot be empty.');
-            return;
-        }
-        if (newName === channel.name) {
+        if (tempChannelName.trim() === channel.name) {
             setEditingName(false);
-            setNameError('');
             return;
         }
-        const exists = await checkChannelNameExists(newName);
-        if (exists) {
-            setNameError('A channel with this name already exists.');
+
+        if (!tempChannelName.trim()) {
+            setNameError('Channel name cannot be empty. Please enter a valid name.');
             return;
         }
+
         try {
-            setUpdating(true);
-            const { error } = await supabase
-                .from('channels')
-                .update({ name: newName, updated_at: new Date().toISOString() })
-                .eq('id', channel.id);
-            if (error) throw error;
-            setEditingName(false);
             setNameError('');
-            onUpdate?.();
+            setUpdating(true);
+            
+            // Check if channel name already exists
+            const nameExists = await checkChannelNameExists(tempChannelName);
+            if (nameExists) {
+                setNameError(`The name "${tempChannelName}" is already taken by another channel. Please try something like "${tempChannelName}-2" or "${tempChannelName}-updated".`);
+                return;
+            }
+            
+            const channelRef = doc(db, 'channels', channel.id);
+            await updateDoc(channelRef, {
+                name: tempChannelName.trim(),
+                updatedAt: serverTimestamp()
+            });
+            
+            setEditingName(false);
+            onUpdate?.(); // Notify parent component to refresh
         } catch (error) {
             console.error('Failed to update channel name:', error);
-            setNameError('Failed to update channel name.');
+            if (error.message.includes('Unable to verify channel name availability')) {
+                setNameError('Unable to verify if this name is available. Please check your connection and try again.');
+            } else {
+                setNameError('Unable to save the new channel name. Please try again in a moment.');
+            }
+            // Reset to original value on error
+            setTempChannelName(channel?.name || '');
         } finally {
             setUpdating(false);
         }
     };
 
+    // Handle channel topic update
     const handleUpdateChannelTopic = async () => {
-        const newTopic = tempTopic.trim();
-        if (newTopic === (channel.topic || '')) {
+        if (tempTopic.trim() === (channel.topic || '')) {
             setEditingTopic(false);
             return;
         }
+
         try {
             setUpdating(true);
-            const { error } = await supabase
-                .from('channels')
-                .update({ topic: newTopic, updated_at: new Date().toISOString() })
-                .eq('id', channel.id);
-            if (error) throw error;
+            
+            const channelRef = doc(db, 'channels', channel.id);
+            await updateDoc(channelRef, {
+                topic: tempTopic.trim(),
+                updatedAt: serverTimestamp()
+            });
+            
             setEditingTopic(false);
-            onUpdate?.();
+            onUpdate?.(); // Notify parent component to refresh
         } catch (error) {
             console.error('Failed to update channel topic:', error);
+            // Reset to original value on error
+            setTempTopic(channel?.topic || '');
         } finally {
             setUpdating(false);
         }
     };
 
+    // Handle channel description update
     const handleUpdateChannelDescription = async () => {
-        const newDescription = tempDescription.trim();
-        if (newDescription === (channel.description || '')) {
+        if (tempDescription.trim() === (channel.description || '')) {
             setEditingDescription(false);
             return;
         }
+
         try {
             setUpdating(true);
-            const { error } = await supabase
-                .from('channels')
-                .update({ description: newDescription, updated_at: new Date().toISOString() })
-                .eq('id', channel.id);
-            if (error) throw error;
+            
+            const channelRef = doc(db, 'channels', channel.id);
+            await updateDoc(channelRef, {
+                description: tempDescription.trim(),
+                updatedAt: serverTimestamp()
+            });
+            
             setEditingDescription(false);
-            onUpdate?.();
+            onUpdate?.(); // Notify parent component to refresh
         } catch (error) {
             console.error('Failed to update channel description:', error);
+            // Reset to original value on error
+            setTempDescription(channel?.description || '');
         } finally {
             setUpdating(false);
         }
@@ -375,6 +420,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
 
     const renderMembersTab = () => (
         <div className="space-y-6">
+            {/* Enhanced Search and Add Members Section */}
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 relative">
@@ -403,6 +449,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
                     )}
                 </div>
                 
+                {/* Member count and stats */}
                 <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
                     <span className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
@@ -419,6 +466,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
                 </div>
             </div>
 
+            {/* Enhanced Members List */}
             <div className="space-y-3">
                 {filteredMembers.map((member) => (
                     <div key={member.id} className="group bg-white border border-gray-200 rounded-xl p-4 hover:border-indigo-200 hover:shadow-md transition-all duration-200">
@@ -473,6 +521,7 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
                 ))}
             </div>
 
+            {/* Enhanced Add Members Modal */}
             {showAddMemberModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl w-full max-w-lg max-h-[600px] flex flex-col shadow-2xl">
@@ -588,103 +637,398 @@ const ChannelAboutModal = ({ isOpen, onClose, channel, onUpdate, onChannelDelete
     );
 
     return (
-        <div className={`fixed inset-0 z-50 overflow-y-auto ${isOpen ? 'block' : 'hidden'}`}>
-            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                    <div className="absolute inset-0 bg-gray-800 opacity-75"></div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-4xl h-[700px] flex flex-col shadow-2xl">
+                {/* Enhanced Header */}
+                <div className="flex-shrink-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-2xl">
+                    <div className="flex items-center justify-between p-6">
+                        <div className="flex items-center space-x-4">
+                            <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                                <Hash className="h-6 w-6" />
+                            </div>
+                            <div className="flex items-center">
+                                <h2 className="text-2xl font-bold">#{channel.name}</h2>
+                                {renderClassMeta()}
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                            <button className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors">
+                                <Star className="h-5 w-5" />
+                            </button>
+                            <div className="relative">
+                                <button className="flex items-center space-x-2 text-sm bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg px-3 py-2 transition-colors">
+                                    <Bell className="h-4 w-4" />
+                                    <span>Notifications</span>
+                                    <ChevronDown className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <button 
+                                onClick={onClose} 
+                                className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-                    <div className="bg-gray-50 px-4 py-3 sm:px-6 flex items-center justify-between border-b border-gray-200">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">
-                            About #{channel?.name || 'Channel'}
-                        </h3>
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                            <X size={20} />
-                        </button>
-                    </div>
 
-                    <div className="border-b border-gray-200">
-                        <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-                            <button 
-                                onClick={() => setActiveTab('about')} 
-                                className={`${activeTab === 'about' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                            >
-                                About
-                            </button>
-                            <button 
-                                onClick={() => setActiveTab('members')} 
-                                className={`${activeTab === 'members' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                            >
-                                Members ({channelMembers.length})
-                            </button>
-                        </nav>
-                    </div>
-                    
-                    <div className="px-4 py-5 sm:p-6">
+                {/* Enhanced Tabs */}
+                <div className="flex-shrink-0 flex border-b border-gray-200 bg-gray-50">
+                    {[
+                        { id: 'about', label: 'About', icon: Settings },
+                        { id: 'members', label: `Members (${channelMembers.length})`, icon: Users },
+                        { id: 'tabs', label: 'Features', icon: Globe }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-all duration-200 ${
+                                activeTab === tab.id
+                                    ? 'text-indigo-600 border-indigo-600 bg-white'
+                                    : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+                            }`}
+                        >
+                            {React.createElement(tab.icon, { className: "h-4 w-4" })}
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Enhanced Content */}
+                <div className="flex-1 overflow-y-auto bg-gray-50">
+                    <div className="p-6">
                         {activeTab === 'about' && (
-                            <div>
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700">Channel Name</label>
-                                    {editingName ? (
-                                        <div className="mt-1 flex rounded-md shadow-sm">
-                                            <input 
-                                                type="text" 
-                                                value={tempChannelName} 
-                                                onChange={(e) => { setTempChannelName(e.target.value); setNameError(''); }}
-                                                className={`flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border-gray-300 ${nameError ? 'border-red-500' : ''}`}
-                                            />
-                                            <button onClick={handleUpdateChannelName} disabled={updating} className="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-500 hover:bg-gray-100 text-sm disabled:opacity-50">
-                                                {updating ? <Loader2 className="animate-spin h-4 w-4"/> : <Check size={16}/>}
-                                            </button>
-                                            <button onClick={() => { setEditingName(false); setTempChannelName(channel?.name || ''); setNameError('');}} className="ml-2 inline-flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 text-sm">
-                                                <X size={16}/>
+                            <div className="space-y-6">
+                                {/* Channel Overview Card */}
+                                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Channel Information</h3>
+                                    
+                                    {/* Channel Name */}
+                                    <div className="mb-6">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <label className="text-sm font-medium text-gray-700">Channel name</label>
+                                            <button 
+                                                onClick={() => setEditingName(!editingName)}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 transition-colors font-medium"
+                                            >
+                                                {editingName ? 'Cancel' : 'Edit'}
                                             </button>
                                         </div>
-                                    ) : (
-                                        <div className="mt-1 flex items-center">
-                                            <p className="text-gray-900 text-lg">{channel?.name || 'Not set'}</p>
-                                            <button onClick={() => setEditingName(true)} className="ml-2 text-indigo-600 hover:text-indigo-800">
-                                                <Edit3 size={16}/>
+                                        {editingName ? (
+                                            <div className="space-y-2">
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={tempChannelName}
+                                                        onChange={(e) => {
+                                                            setTempChannelName(e.target.value);
+                                                            setNameError(''); // Clear error on change
+                                                        }}
+                                                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                        placeholder="Enter channel name"
+                                                    />
+                                                    <button 
+                                                        onClick={handleUpdateChannelName}
+                                                        disabled={updating}
+                                                        className="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {updating ? 'Saving...' : 'Save'}
+                                                    </button>
+                                                </div>
+                                                {nameError && (
+                                                    <div className="text-sm text-red-600 mt-1">
+                                                        {nameError}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                                <Hash className="h-5 w-5 text-gray-400" />
+                                                <span className="text-gray-900 font-medium">{channel.name}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Channel Type */}
+                                    <div className="mb-6">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <label className="text-sm font-medium text-gray-700">Channel Type</label>
+                                            {!editingType ? (
+                                                <button 
+                                                    onClick={() => setEditingType(true)}
+                                                    className="text-sm text-indigo-600 hover:text-indigo-700 transition-colors font-medium"
+                                                >
+                                                    Edit
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={handleCancelTypeEdit}
+                                                        disabled={updating}
+                                                        className="text-sm text-gray-600 hover:text-gray-700 transition-colors disabled:opacity-50"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={handleUpdateChannelType}
+                                                        disabled={updating}
+                                                        className="text-sm text-indigo-600 hover:text-indigo-700 transition-colors disabled:opacity-50 font-medium"
+                                                    >
+                                                        {updating ? 'Saving...' : 'Save'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {!editingType ? (
+                                            <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                                {React.createElement(getCurrentChannelType().icon, { className: "h-5 w-5 text-indigo-600" })}
+                                                <div>
+                                                    <span className="text-gray-900 font-medium">{getCurrentChannelType().name}</span>
+                                                    <p className="text-sm text-gray-500">{getCurrentChannelType().description}</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                                                    disabled={updating}
+                                                    className="w-full flex items-center justify-between px-4 py-3 text-left border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-50 hover:border-gray-400 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        {channelTypes.find(t => t.id === selectedType)?.icon && 
+                                                            React.createElement(channelTypes.find(t => t.id === selectedType).icon, { className: "h-5 w-5 text-indigo-600" })
+                                                        }
+                                                        <span className="text-gray-900 font-medium">
+                                                            {channelTypes.find(t => t.id === selectedType)?.name || 'Select type'}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                                                </button>
+                                                
+                                                {showTypeDropdown && (
+                                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                        {channelTypes.map((type) => (
+                                                            <button
+                                                                key={type.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedType(type.id);
+                                                                    setShowTypeDropdown(false);
+                                                                }}
+                                                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg transition-colors"
+                                                            >
+                                                                {React.createElement(type.icon, { className: "h-5 w-5 text-indigo-600" })}
+                                                                <div>
+                                                                    <span className="text-gray-900 font-medium">{type.name}</span>
+                                                                    <p className="text-sm text-gray-500">{type.description}</p>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Topic */}
+                                    <div className="mb-6">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <label className="text-sm font-medium text-gray-700">Topic</label>
+                                            <button 
+                                                onClick={() => setEditingTopic(!editingTopic)}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 transition-colors font-medium"
+                                            >
+                                                {editingTopic ? 'Cancel' : 'Edit'}
+                                            </button>
+                                        </div>
+                                        {editingTopic ? (
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={tempTopic}
+                                                    onChange={(e) => setTempTopic(e.target.value)}
+                                                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                                    placeholder="Add a topic for this channel"
+                                                />
+                                                <button 
+                                                    onClick={handleUpdateChannelTopic}
+                                                    disabled={updating}
+                                                    className="px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                >
+                                                    {updating ? 'Saving...' : 'Save'}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                                <p className="text-gray-500 text-sm">
+                                                    {channel.topic || 'Add a topic to help others understand what this channel is for'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Description */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <label className="text-sm font-medium text-gray-700">Description</label>
+                                            <button 
+                                                onClick={() => setEditingDescription(!editingDescription)}
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 transition-colors font-medium"
+                                            >
+                                                {editingDescription ? 'Cancel' : 'Edit'}
+                                            </button>
+                                        </div>
+                                        {editingDescription ? (
+                                            <div className="space-y-2">
+                                                <textarea
+                                                    value={tempDescription}
+                                                    onChange={(e) => setTempDescription(e.target.value)}
+                                                    rows={3}
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                                                    placeholder="Add a description for this channel"
+                                                />
+                                                <div className="flex justify-end">
+                                                    <button 
+                                                        onClick={handleUpdateChannelDescription}
+                                                        disabled={updating}
+                                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm disabled:opacity-50"
+                                                    >
+                                                        {updating ? 'Saving...' : 'Save'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                                <p className="text-gray-500 text-sm">
+                                                    {channel.description || 'Add a description to provide more context about this channel'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Channel Metadata Card */}
+                                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Channel Details</h3>
+                                    
+                                    {/* Created by */}
+                                    <div className="mb-6">
+                                        <label className="text-sm font-medium text-gray-700 mb-3 block">Created by</label>
+                                        <div className="flex items-center bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                                            <div className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-4">
+                                                {channel.createdBy?.charAt(0) || 'U'}
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-900 font-medium">Bien Ng</span>
+                                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                    <Calendar className="h-4 w-4" />
+                                                    <span>Created on {formatCreatedDate(channel.createdAt)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Channel Privacy */}
+                                    <div className="mb-6">
+                                        <label className="text-sm font-medium text-gray-700 mb-3 block">Privacy</label>
+                                        <div className="flex items-center bg-gray-50 rounded-lg p-4">
+                                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                                                {channel.private ? <Lock className="h-5 w-5 text-green-600" /> : <Globe className="h-5 w-5 text-green-600" />}
+                                            </div>
+                                            <div>
+                                                <span className="text-gray-900 font-medium">
+                                                    {channel.private ? 'Private Channel' : 'Public Channel'}
+                                                </span>
+                                                <p className="text-sm text-gray-500">
+                                                    {channel.private 
+                                                        ? 'Only invited members can see and join this channel'
+                                                        : 'Anyone in the workspace can see and join this channel'
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Channel ID */}
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-700 mb-3 block">Channel ID</label>
+                                        <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-4">
+                                            <code className="flex-1 text-sm text-gray-600 font-mono">{channel.id}</code>
+                                            <button 
+                                                onClick={handleCopyChannelId}
+                                                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-colors"
+                                                title="Copy channel ID"
+                                            >
+                                                {copiedChannelId ? (
+                                                    <>
+                                                        <Check className="h-4 w-4 text-green-600" />
+                                                        <span className="text-green-600">Copied!</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="h-4 w-4" />
+                                                        <span>Copy</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Actions Card */}
+                                <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                                    
+                                    {/* Leave Channel */}
+                                    <button className="w-full flex items-center justify-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 text-sm font-medium py-3 rounded-lg transition-colors border border-red-200 hover:border-red-300 mb-4">
+                                        <X className="h-4 w-4" />
+                                        Leave channel
+                                    </button>
+
+                                    {/* Delete Channel - Only for creators/admins */}
+                                    {canDeleteChannel() && (
+                                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                            <div className="flex items-start gap-3 mb-3">
+                                                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                                                <div>
+                                                    <h4 className="text-sm font-semibold text-red-900">Danger Zone</h4>
+                                                    <p className="text-sm text-red-700 mt-1">
+                                                        Permanently delete this channel and all its messages. This action cannot be undone.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowDeleteModal(true)}
+                                                disabled={loading}
+                                                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm font-medium shadow-sm"
+                                            >
+                                                {loading ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-4 w-4" />
+                                                )}
+                                                Delete Channel
                                             </button>
                                         </div>
                                     )}
-                                    {nameError && <p className="mt-1 text-xs text-red-500">{nameError}</p>}
                                 </div>
-                                <p className="text-sm text-gray-500 mt-2">Channel ID: <span className="font-mono bg-gray-100 px-1 rounded">{channel.id}</span> <button onClick={handleCopyChannelId} className="ml-1 text-indigo-600 hover:text-indigo-500 text-xs">{copiedChannelId ? 'Copied!' : 'Copy'}</button></p>
                             </div>
                         )}
                         {activeTab === 'members' && renderMembersTab()}
-                    </div>
-
-                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button 
-                            type="button" 
-                            onClick={onClose} 
-                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                        >
-                            Close
-                        </button>
-                        {canDeleteThisChannel() && (
-                             <button 
-                                type="button" 
-                                onClick={() => setShowDeleteModal(true)} 
-                                className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                            >
-                                Delete Channel
-                            </button>
-                        )}
+                        {activeTab === 'tabs' && renderTabsTab()}
                     </div>
                 </div>
             </div>
-            {showDeleteModal && (
-                <DeleteChannelModal 
-                    isOpen={showDeleteModal} 
-                    onClose={() => setShowDeleteModal(false)} 
-                    channelName={channel.name} 
-                    onConfirmDelete={handleDeleteChannel}
-                />
-            )}
+
+            {/* Delete Channel Modal */}
+            <DeleteChannelModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                channel={channel}
+                onConfirm={handleDeleteChannel}
+                loading={loading}
+            />
         </div>
     );
 };

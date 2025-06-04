@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export function useCities() {
   const [cities, setCities] = useState([]);
@@ -8,15 +9,9 @@ export function useCities() {
   const fetchCities = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('cities')
-        .select('*');
-
-      if (error) {
-        throw error;
-      }
-
-      setCities(data || []);
+      const snapshot = await getDocs(collection(db, 'cities'));
+      const citiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCities(citiesData);
     } catch (error) {
       console.error('Error fetching cities:', error);
     } finally {
@@ -39,17 +34,10 @@ export function useCities() {
         throw new Error(`City "${trimmedCity}" already exists`);
       }
       
-      const { data, error } = await supabase
-        .from('cities')
-        .insert([{ value: trimmedCity }])
-        .select();
-      
-      if (error) {
-        throw error;
-      }
+      const docRef = await addDoc(collection(db, 'cities'), { value: trimmedCity });
       
       // Add to local state immediately
-      const newCity = data[0];
+      const newCity = { id: docRef.id, value: trimmedCity };
       setCities(prev => [...prev, newCity]);
       
       return newCity;
@@ -61,15 +49,7 @@ export function useCities() {
 
   const deleteCity = async (id) => {
     try {
-      const { error } = await supabase
-        .from('cities')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        throw error;
-      }
-      
+      await deleteDoc(doc(db, 'cities', id));
       setCities(prev => prev.filter(city => city.id !== id));
     } catch (error) {
       console.error('Error deleting city:', error);

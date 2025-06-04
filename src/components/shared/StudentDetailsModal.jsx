@@ -7,9 +7,9 @@ import { useCountries } from '../../hooks/useCountries';
 import { useCities } from '../../hooks/useCities';
 import { usePlatforms } from '../../hooks/usePlatforms';
 import { useCategories } from '../../hooks/useCategories';
+import FirebaseCollectionSelector from './FirebaseCollectionSelector';
+import FirebaseMultiSelectSelector from './FirebaseMultiSelectSelector';
 import { useFieldEdit } from '../../hooks/useFieldEdit';
-import SupabaseCollectionSelector from './SupabaseCollectionSelector';
-import SupabaseMultiSelectSelector from './SupabaseMultiSelectSelector';
 
 const StudentDetailsModal = ({ 
   enrollment,
@@ -514,7 +514,7 @@ const StudentDetailsModal = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-2">Country</label>
                   <div className="relative">
-                    <SupabaseCollectionSelector
+                    <FirebaseCollectionSelector
                       collectionName="countries"
                       record={displayData}
                       updateRecord={updateStudentRecord}
@@ -529,7 +529,7 @@ const StudentDetailsModal = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-2">City</label>
                   <div className="relative">
-                    <SupabaseCollectionSelector
+                    <FirebaseCollectionSelector
                       collectionName="cities"
                       record={displayData}
                       updateRecord={updateStudentRecord}
@@ -556,7 +556,7 @@ const StudentDetailsModal = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-2">Learning Platform</label>
                   <div className="relative">
-                    <SupabaseCollectionSelector
+                    <FirebaseCollectionSelector
                       collectionName="platforms"
                       record={displayData}
                       updateRecord={updateStudentRecord}
@@ -571,7 +571,7 @@ const StudentDetailsModal = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-2">Interest Categories</label>
                   <div className="relative">
-                    <SupabaseMultiSelectSelector
+                    <FirebaseMultiSelectSelector
                       collectionName="categories"
                       record={displayData}
                       updateRecord={updateStudentRecord}

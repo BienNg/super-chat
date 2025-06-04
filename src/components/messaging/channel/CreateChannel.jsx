@@ -1,8 +1,9 @@
 // src/components/CreateChannel.jsx
 import React, { useState } from 'react';
-import { X, Hash, Lock, ChevronDown } from 'lucide-react';
-import { supabase } from '../../../utils/supabaseClient';
-import { useAuth } from '../../../contexts/SupabaseAuthContext';
+import { X, Hash, Lock } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../../firebase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useChannelClassSync } from '../../../hooks/useChannelClassSync';
 import { CHANNEL_TYPE_OPTIONS } from '../../../utils/channelTypes';
 
@@ -19,22 +20,16 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
     const { currentUser } = useAuth();
     const { handleChannelTypeChange } = useChannelClassSync();
 
+    // Function to check if channel name already exists
     const checkChannelNameExists = async (channelName) => {
         try {
-            const { data, error: checkError } = await supabase
-                    .from('channels')
-                    .select('id')
-                .eq('name', channelName.trim())
-                .maybeSingle();
-                
-            if (checkError && checkError.code !== 'PGRST116') {
-                console.error('Error checking channel name in Supabase:', checkError);
-                    throw new Error('Unable to verify channel name availability');
-                }
-            return !!data;
-        } catch (err) {
-            console.error('Error checking channel name:', err);
-            throw err;
+            const channelsRef = collection(db, 'channels');
+            const q = query(channelsRef, where('name', '==', channelName.trim()));
+            const snapshot = await getDocs(q);
+            return !snapshot.empty;
+        } catch (error) {
+            console.error('Error checking channel name:', error);
+            throw new Error('Unable to verify channel name availability');
         }
     };
 
@@ -50,68 +45,61 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
             setError('');
             setLoading(true);
 
+            // Check if channel name already exists
             const nameExists = await checkChannelNameExists(channelData.name);
             if (nameExists) {
-                setError(`A channel named "${channelData.name}" already exists. Please try a different name.`);
-                setLoading(false);
+                setError(`A channel named "${channelData.name}" already exists in this workspace. Please try a different name like "${channelData.name}-2" or "${channelData.name}-new".`);
                 return;
             }
 
-            const userId = currentUser?.id;
-            if (!userId) {
-                throw new Error('User is not authenticated');
-            }
+            const timestamp = serverTimestamp();
+            const channelRef = await addDoc(collection(db, 'channels'), {
+                name: channelData.name.trim(),
+                type: channelData.type,
+                members: [currentUser.uid], // Creator is automatically a member
+                admins: [currentUser.uid], // Creator is automatically an admin
+                createdBy: currentUser.uid,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+                settings: {
+                    allowMemberInvites: false,
+                    isPrivate: channelData.isPrivate,
+                    notifications: true
+                }
+            });
 
-                const timestamp = new Date().toISOString();
-            const { data: newChannel, error: insertError } = await supabase
-                    .from('channels')
-                    .insert({
-                        name: channelData.name.trim(),
-                        description: `Channel for ${channelData.name.trim()}`,
-                        members: [userId],
-                        admins: [userId],
-                        created_by: userId,
-                        created_at: timestamp,
-                        updated_at: timestamp
-                    })
-                    .select()
-                    .single();
-                
-            if (insertError) {
-                throw insertError;
-            }
-            
-            const channelId = newChannel.id;
-
+            // If channel type is 'class', automatically create a class object
             if (channelData.type === 'class') {
                 try {
-                    await handleChannelTypeChange(channelId, 'class', 'general', channelData.name.trim());
+                    await handleChannelTypeChange(channelRef.id, 'class', 'general', channelData.name.trim());
                     console.log(`Auto-created class for new channel: ${channelData.name.trim()}`);
                 } catch (classError) {
                     console.error('Error creating class for new channel:', classError);
+                    // Don't fail the channel creation if class creation fails
                 }
             }
 
+            // Close the modal immediately
             onClose();
+
+            // Call the onChannelCreated callback with the new channel ID
             if (onChannelCreated) {
-                onChannelCreated(channelId, newChannel);
+                onChannelCreated(channelRef.id);
             }
             
+            // Reset form
             setChannelData({
                 name: '',
                 type: 'general',
                 isPrivate: false,
                 showTypeDropdown: false
             });
-
         } catch (error) {
             console.error('Error creating channel:', error);
             if (error.message.includes('Unable to verify channel name availability')) {
-                setError('Unable to check if this channel name is available. Please try again.');
-            } else if (error.message.includes('duplicate key value violates unique constraint')) {
-                setError(`A channel named "${channelData.name}" already exists. Please try a different name.`);
+                setError('Unable to check if this channel name is available. Please check your internet connection and try again.');
             } else {
-                setError('Something went wrong while creating your channel. Please try again.');
+                setError('Something went wrong while creating your channel. Please try again in a moment.');
             }
         } finally {
             setLoading(false);
@@ -123,6 +111,7 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg w-full max-w-md p-6">
+                {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-semibold text-gray-900">Create New Channel</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -137,6 +126,7 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Channel Name */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             <Hash className="h-4 w-4 inline mr-1" />
@@ -146,37 +136,37 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
                             type="text"
                             value={channelData.name}
                             onChange={(e) => {
+                                // Convert to lowercase, replace whitespace with dashes, and allow only letters, numbers, and hyphens
                                 const value = e.target.value
                                     .toLowerCase()
                                     .replace(/\s+/g, '-')
                                     .replace(/[^a-z0-9-]/g, '');
                                 setChannelData((prev) => ({ ...prev, name: value }));
-                                setError('');
                             }}
-                            placeholder="e.g., project-alpha, marketing-team"
+                            placeholder="e.g., Project Alpha, Marketing Team"
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             required
                             autoFocus
                         />
-                        <p className="text-xs text-gray-500 mt-1">Use lowercase letters, numbers, and hyphens.</p>
+                        <p className="text-xs text-gray-500 mt-1">Spaces and uppercase letters will be automatically converted to lowercase with dashes</p>
                     </div>
 
+                    {/* Channel Type */}
                     <div className="relative">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Channel Type</label>
                         <div className="relative">
                             <button
                                 type="button"
                                 onClick={() => setChannelData(prev => ({ ...prev, showTypeDropdown: !prev.showTypeDropdown }))}
-                                className="w-full px-4 py-2 text-left border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white flex justify-between items-center"
+                                className="w-full px-4 py-2 text-left border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                             >
                                 <span className="text-sm text-gray-900">
                                     {CHANNEL_TYPE_OPTIONS.find(t => t.id === channelData.type)?.name || 'Select type'}
                                 </span>
-                                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${channelData.showTypeDropdown ? 'transform rotate-180' : ''}`} />
                             </button>
                             
                             {channelData.showTypeDropdown && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
                                     {CHANNEL_TYPE_OPTIONS.map((type) => (
                                         <button
                                             key={type.id}
@@ -188,10 +178,9 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
                                                     showTypeDropdown: false 
                                                 }));
                                             }}
-                                            className="w-full px-4 py-3 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg text-sm text-gray-700 flex items-center gap-2"
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                                         >
-                                            {type.icon && React.createElement(type.icon, { className: "h-4 w-4 text-indigo-500" })}
-                                            {type.name}
+                                            <span className="text-sm text-gray-900">{type.name}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -199,57 +188,43 @@ const CreateChannel = ({ isOpen, onClose, onChannelCreated }) => {
                         </div>
                     </div>
 
+                    {/* Privacy Setting */}
+                    <div className="flex items-start p-4 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                            <div className="flex items-center">
+                                <Lock className="h-5 w-5 text-gray-500 mr-3" />
                                 <div>
-                        <label htmlFor="isPrivateToggle" className="flex items-center cursor-pointer">
-                            <div className="relative">
-                                <input 
-                                    type="checkbox" 
-                                    id="isPrivateToggle" 
-                                    className="sr-only" 
-                                    checked={channelData.isPrivate}
-                                    onChange={() => setChannelData(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
-                                />
-                                <div className={`block w-10 h-6 rounded-full transition ${channelData.isPrivate ? 'bg-indigo-600' : 'bg-gray-200'}`}></div>
-                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${channelData.isPrivate ? 'transform translate-x-full' : ''}`}></div>
+                                    <p className="text-sm font-medium text-gray-900">Private Channel</p>
+                                    <p className="text-xs text-gray-500">Only invited members can access</p>
+                                </div>
                             </div>
-                            <div className="ml-3 text-sm text-gray-700">
-                                {channelData.isPrivate ? (
-                                    <><Lock className="h-4 w-4 inline mr-1 text-indigo-600" /> Private Channel</>
-                                ) : (
-                                    'Public Channel'
-                                )}
                         </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={channelData.isPrivate}
+                                onChange={(e) => setChannelData((prev) => ({ ...prev, isPrivate: e.target.checked }))}
+                                className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </label>
-                        <p className="text-xs text-gray-500 mt-1">
-                            {channelData.isPrivate 
-                                ? 'Only invited members can view and join.' 
-                                : 'Anyone in your workspace can view and join.'}
-                        </p>
                     </div>
 
-                    <div className="flex justify-end pt-2">
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-3 pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            disabled={loading}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 mr-2"
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                            disabled={loading || !channelData.name.trim()}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? (
-                                <>
-                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Creating...
-                                </> 
-                            ) : 'Create Channel'}
+                            {loading ? 'Creating...' : 'Create Channel'}
                         </button>
                     </div>
                 </form>

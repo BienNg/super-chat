@@ -1,7 +1,9 @@
 // src/components/OnboardingFlow.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Check, Upload, User, Users, DollarSign, MessageSquare, Headphones, Camera, Plus } from 'lucide-react';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const OnboardingFlow = ({ onComplete }) => {
     const [currentScreen, setCurrentScreen] = useState(1);
@@ -15,13 +17,7 @@ const OnboardingFlow = ({ onComplete }) => {
     });
     const [loading, setLoading] = useState(false);
 
-    const { currentUser, userProfile, updateUserProfile } = useAuth();
-    
-    console.log("OnboardingFlow rendered with currentUser:", currentUser, "userProfile:", userProfile);
-    
-    useEffect(() => {
-        console.log("Auth state in OnboardingFlow changed - currentUser:", currentUser, "userProfile:", userProfile);
-    }, [currentUser, userProfile]);
+    const { currentUser } = useAuth();
 
     const roles = [
         { id: 'teacher', name: 'Teacher', description: 'Manage classes and student progress', icon: Users },
@@ -48,49 +44,29 @@ const OnboardingFlow = ({ onComplete }) => {
     const handleCompleteSetup = async () => {
         try {
             setLoading(true);
-            console.log("Starting onboarding completion process with Supabase Auth");
             
-            if (!currentUser) {
-                console.error("Error: currentUser is undefined in handleCompleteSetup");
-                setLoading(false);
-                throw new Error("User not authenticated");
-            }
-            
-            console.log("Current user for Supabase update:", currentUser.id);
-            
-            // Determine primary role
-            let primaryRole = '';
-            if (selectedRoles.includes('custom') && customRole) {
-                primaryRole = customRole;
-            } else if (selectedRoles.length > 0) {
-                const firstSelectedRole = roles.find(r => r.id === selectedRoles[0]);
-                primaryRole = firstSelectedRole ? firstSelectedRole.name : selectedRoles[0];
-            }
+            const finalRoles = selectedRoles.map((roleId) => {
+                if (roleId === 'custom') {
+                    return { id: 'custom', name: customRole || 'Custom Role' };
+                }
+                const role = roles.find((r) => r.id === roleId);
+                return { id: roleId, name: role?.name || roleId };
+            });
 
-            // Convert to snake_case for Supabase
-            const updateData = {
-                display_name: profileData.fullName,
-                role: primaryRole,
+            const userRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userRef, {
+                roles: finalRoles,
+                fullName: profileData.fullName,
                 department: profileData.department,
                 bio: profileData.bio,
-                roles: selectedRoles.map(roleId => {
-                    if (roleId === 'custom') return customRole || 'Custom';
-                    const roleObj = roles.find(r => r.id === roleId);
-                    return roleObj ? roleObj.name : roleId;
-                }),
-                is_onboarding_complete: true,
-                updated_at: new Date().toISOString()
-            };
-            
-            console.log("About to update Supabase profile with data:", updateData);
-            
-            const updatedProfile = await updateUserProfile(currentUser.id, updateData);
-            console.log("Supabase Profile update completed:", updatedProfile);
+                photo: profileData.photo,
+                isOnboardingComplete: true,
+                updatedAt: new Date()
+            });
 
-            console.log("Onboarding completion successful, calling onComplete callback");
             onComplete?.();
         } catch (error) {
-            console.error('Error completing onboarding with Supabase:', error);
+            console.error('Error completing onboarding:', error);
         } finally {
             setLoading(false);
         }

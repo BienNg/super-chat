@@ -1,5 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { 
+    collection, 
+    query, 
+    where,
+    orderBy, 
+    onSnapshot,
+    addDoc,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    updateDoc,
+    serverTimestamp,
+    limit
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useBookmarks = () => {
@@ -9,56 +24,16 @@ export const useBookmarks = () => {
     
     const { currentUser, userProfile } = useAuth();
 
-    // Fetch bookmarks when user changes
+    // Temporarily disable real-time listener to reduce Firestore load
     useEffect(() => {
         if (!currentUser) {
             setBookmarks([]);
             return;
         }
 
-        const fetchBookmarks = async () => {
-            setLoading(true);
-            try {
-                const { data, error: fetchError } = await supabase
-                    .from('bookmarks')
-                    .select('*')
-                    .eq('user_id', currentUser.id)
-                    .order('created_at', { ascending: false });
-                
-                if (fetchError) throw fetchError;
-                setBookmarks(data || []);
-                setError(null);
-            } catch (err) {
-                console.error('Error fetching bookmarks:', err);
-                setError(err.message);
-                setBookmarks([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchBookmarks();
-
-        // Set up real-time subscription
-        const bookmarksSubscription = supabase
-            .channel(`bookmarks-${currentUser.id}`)
-            .on('postgres_changes', 
-                { 
-                    event: '*', 
-                    schema: 'public', 
-                    table: 'bookmarks',
-                    filter: `user_id=eq.${currentUser.id}`
-                },
-                (payload) => {
-                    // Refresh bookmarks when there's a change
-                    fetchBookmarks();
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(bookmarksSubscription);
-        };
+        // Just set empty for now
+        setBookmarks([]);
+        setLoading(false);
     }, [currentUser]);
 
     // Add a new bookmark
@@ -76,44 +51,37 @@ export const useBookmarks = () => {
 
             // Check if bookmark already exists
             const existingBookmark = bookmarks.find(
-                bookmark => bookmark.target_id === targetId && 
+                bookmark => bookmark.targetId === targetId && 
                            bookmark.type === type && 
-                           bookmark.user_id === currentUser.id
+                           bookmark.userId === currentUser.uid
             );
 
             if (existingBookmark) {
                 throw new Error('This item is already bookmarked');
             }
 
-            const timestamp = new Date().toISOString();
             const bookmark = {
-                user_id: currentUser.id,
+                userId: currentUser.uid,
                 type, // 'message', 'file', 'link', 'task'
-                target_id: targetId,
-                channel_id: channelId,
+                targetId,
+                channelId,
                 title,
                 description: bookmarkData.description || null,
                 url: bookmarkData.url || null, // For link bookmarks
                 metadata: bookmarkData.metadata || {}, // Additional data specific to bookmark type
                 tags: bookmarkData.tags || [], // User-defined tags
-                created_at: timestamp,
-                updated_at: timestamp,
-                is_private: bookmarkData.isPrivate || false, // Private bookmarks only visible to user
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                isPrivate: bookmarkData.isPrivate || false, // Private bookmarks only visible to user
                 notes: bookmarkData.notes || null // User notes about the bookmark
             };
 
-            const { data: newBookmark, error: insertError } = await supabase
-                .from('bookmarks')
-                .insert(bookmark)
-                .select()
-                .single();
-            
-            if (insertError) throw insertError;
+            const docRef = await addDoc(collection(db, 'bookmarks'), bookmark);
             
             return {
                 success: true,
-                bookmarkId: newBookmark.id,
-                bookmark: newBookmark
+                bookmarkId: docRef.id,
+                bookmark: { id: docRef.id, ...bookmark }
             };
 
         } catch (error) {
@@ -135,16 +103,11 @@ export const useBookmarks = () => {
                 throw new Error('Bookmark not found');
             }
 
-            if (bookmark.user_id !== currentUser.id) {
+            if (bookmark.userId !== currentUser.uid) {
                 throw new Error('You can only remove your own bookmarks');
             }
 
-            const { error: deleteError } = await supabase
-                .from('bookmarks')
-                .delete()
-                .eq('id', bookmarkId);
-            
-            if (deleteError) throw deleteError;
+            await deleteDoc(doc(db, 'bookmarks', bookmarkId));
             
             return { success: true, bookmarkId };
 
@@ -167,11 +130,11 @@ export const useBookmarks = () => {
                 throw new Error('Bookmark not found');
             }
 
-            if (bookmark.user_id !== currentUser.id) {
+            if (bookmark.userId !== currentUser.uid) {
                 throw new Error('You can only update your own bookmarks');
             }
 
-            const allowedUpdates = ['notes', 'tags', 'is_private', 'title', 'description'];
+            const allowedUpdates = ['notes', 'tags', 'isPrivate', 'title', 'description'];
             const filteredUpdates = Object.keys(updates)
                 .filter(key => allowedUpdates.includes(key))
                 .reduce((obj, key) => {
@@ -183,18 +146,11 @@ export const useBookmarks = () => {
                 throw new Error('No valid updates provided');
             }
 
-            filteredUpdates.updated_at = new Date().toISOString();
+            filteredUpdates.updatedAt = serverTimestamp();
 
-            const { data: updatedBookmark, error: updateError } = await supabase
-                .from('bookmarks')
-                .update(filteredUpdates)
-                .eq('id', bookmarkId)
-                .select()
-                .single();
+            await updateDoc(doc(db, 'bookmarks', bookmarkId), filteredUpdates);
             
-            if (updateError) throw updateError;
-            
-            return { success: true, bookmarkId, updates: filteredUpdates, bookmark: updatedBookmark };
+            return { success: true, bookmarkId, updates: filteredUpdates };
 
         } catch (error) {
             console.error('Error updating bookmark:', error);
@@ -207,9 +163,9 @@ export const useBookmarks = () => {
         if (!currentUser || !targetId || !type) return false;
         
         return bookmarks.some(
-            bookmark => bookmark.target_id === targetId && 
+            bookmark => bookmark.targetId === targetId && 
                        bookmark.type === type && 
-                       bookmark.user_id === currentUser.id
+                       bookmark.userId === currentUser.uid
         );
     }, [bookmarks, currentUser]);
 
@@ -219,7 +175,7 @@ export const useBookmarks = () => {
 
         try {
             const channelBookmarks = bookmarks.filter(
-                bookmark => bookmark.channel_id === channelId
+                bookmark => bookmark.channelId === channelId
             );
             
             return channelBookmarks;
@@ -245,7 +201,7 @@ export const useBookmarks = () => {
 
         // Filter by channel if specified
         if (channelId) {
-            filtered = filtered.filter(bookmark => bookmark.channel_id === channelId);
+            filtered = filtered.filter(bookmark => bookmark.channelId === channelId);
         }
 
         // Search in title, description, notes, and tags
@@ -292,12 +248,16 @@ export const useBookmarks = () => {
                 bookmarksData.map(bookmarkData => addBookmark(bookmarkData))
             );
 
+            const successful = results.filter(result => result.status === 'fulfilled');
+            const failed = results.filter(result => result.status === 'rejected');
+
             return {
                 success: true,
-                results: results,
-                successful: results.filter(r => r.status === 'fulfilled').length,
-                failed: results.filter(r => r.status === 'rejected').length
+                added: successful.length,
+                failed: failed.length,
+                errors: failed.map(result => result.reason.message)
             };
+
         } catch (error) {
             console.error('Error adding multiple bookmarks:', error);
             throw error;
@@ -311,35 +271,98 @@ export const useBookmarks = () => {
 
         try {
             const results = await Promise.allSettled(
-                bookmarkIds.map(id => removeBookmark(id))
+                bookmarkIds.map(bookmarkId => removeBookmark(bookmarkId))
             );
+
+            const successful = results.filter(result => result.status === 'fulfilled');
+            const failed = results.filter(result => result.status === 'rejected');
 
             return {
                 success: true,
-                results: results,
-                successful: results.filter(r => r.status === 'fulfilled').length,
-                failed: results.filter(r => r.status === 'rejected').length
+                removed: successful.length,
+                failed: failed.length,
+                errors: failed.map(result => result.reason.message)
             };
+
         } catch (error) {
             console.error('Error removing multiple bookmarks:', error);
             throw error;
         }
     };
 
+    // Export bookmarks (for backup/sharing)
+    const exportBookmarks = useCallback((channelId = null) => {
+        let exportData = bookmarks;
+        
+        if (channelId) {
+            exportData = bookmarks.filter(bookmark => bookmark.channelId === channelId);
+        }
+
+        const exportObject = {
+            exportedAt: new Date().toISOString(),
+            userId: currentUser?.uid,
+            channelId: channelId || 'all',
+            bookmarks: exportData.map(bookmark => ({
+                ...bookmark,
+                // Remove Firestore-specific fields
+                createdAt: bookmark.createdAt?.toDate?.() || bookmark.createdAt,
+                updatedAt: bookmark.updatedAt?.toDate?.() || bookmark.updatedAt
+            }))
+        };
+
+        return exportObject;
+    }, [bookmarks, currentUser]);
+
+    // Get bookmark statistics
+    const getBookmarkStats = useCallback(() => {
+        if (!currentUser) return null;
+
+        const stats = {
+            total: bookmarks.length,
+            byType: {},
+            byChannel: {},
+            withTags: bookmarks.filter(b => b.tags && b.tags.length > 0).length,
+            private: bookmarks.filter(b => b.isPrivate).length
+        };
+
+        // Count by type
+        bookmarks.forEach(bookmark => {
+            stats.byType[bookmark.type] = (stats.byType[bookmark.type] || 0) + 1;
+        });
+
+        // Count by channel
+        bookmarks.forEach(bookmark => {
+            stats.byChannel[bookmark.channelId] = (stats.byChannel[bookmark.channelId] || 0) + 1;
+        });
+
+        return stats;
+    }, [bookmarks, currentUser]);
+
     return {
+        // State
         bookmarks,
         loading,
         error,
+
+        // Core operations
         addBookmark,
         removeBookmark,
         updateBookmark,
         isBookmarked,
+
+        // Query operations
         getBookmarksByChannel,
         getBookmarksByType,
         searchBookmarks,
         getBookmarksWithTags,
         getAllTags,
+
+        // Bulk operations
         addMultipleBookmarks,
-        removeMultipleBookmarks
+        removeMultipleBookmarks,
+
+        // Utility operations
+        exportBookmarks,
+        getBookmarkStats
     };
 }; 

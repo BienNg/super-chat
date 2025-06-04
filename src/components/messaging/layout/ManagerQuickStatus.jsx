@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useAdvancedSupabaseMonitor } from '../../../contexts/AdvancedSupabaseMonitorContext';
-import { getRecentOperations, getStats } from '../../../utils/comprehensiveSupabaseTracker';
+import { useManagerFirebaseMonitor } from '../../../contexts/AdvancedFirebaseMonitorContext';
+import { enableDebugMode, getRecentOperations, getStats } from '../../../utils/comprehensiveFirebaseTracker';
 import { usePermissions } from '../../../hooks/usePermissions';
 
 const ManagerQuickStatus = () => {
-  const { stats, isActive } = useAdvancedSupabaseMonitor();
+  const { stats, isActive } = useManagerFirebaseMonitor();
   const [showContextMenu, setShowContextMenu] = useState(false);
   const { isAdmin } = usePermissions();
 
@@ -40,8 +40,9 @@ const ManagerQuickStatus = () => {
   }
 
   const handleDebugClick = () => {
-    console.log('🐛 Debug mode enabled! Check console for detailed Supabase tracking info.');
-    alert('Debug mode enabled! Check browser console for detailed Supabase tracking information.');
+    enableDebugMode();
+    console.log('🐛 Debug mode enabled! Check console for detailed Firebase tracking info.');
+    alert('Debug mode enabled! Check browser console for detailed Firebase tracking information.');
   };
 
   const handleRightClick = (e) => {
@@ -64,7 +65,7 @@ const ManagerQuickStatus = () => {
         operations: allOperations.map(op => ({
           timestamp: new Date(op.timestamp).toISOString(),
           type: op.type,
-          collection: op.table || op.collection,
+          collection: op.collection,
           resultCount: op.resultCount,
           details: op.details,
           cost: op.cost
@@ -77,7 +78,7 @@ const ManagerQuickStatus = () => {
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `supabase-quick-export-${Date.now()}.json`;
+      link.download = `firebase-quick-export-${Date.now()}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

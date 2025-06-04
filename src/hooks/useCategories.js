@@ -1,68 +1,23 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '../utils/supabaseClient';
-
-/**
- * IMPORTANT: This hook requires a 'categories' table in your Supabase database.
- * 
- * If you're seeing errors about the 'categories' table not existing, you need to
- * ensure that your database migrations (e.g., located in the 'migration'
- * directory) have been run. The 'categories' table should be defined in a
- * migration file like 'supabase-crm-migration.sql' or similar.
- * 
- * The hook will use default categories when the table doesn't exist to avoid app crashes.
- */
-
-// Default categories to use when the table doesn't exist
-const DEFAULT_CATEGORIES = [
-  { id: 'c1', value: 'General' },
-  { id: 'c2', value: 'Academic' },
-  { id: 'c3', value: 'Visa' },
-  { id: 'c4', value: 'Admin' },
-  { id: 'c5', value: 'Financial' }
-];
+import { useEffect, useState, useCallback } from 'react';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export function useCategories() {
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tableMissing, setTableMissing] = useState(false);
-  const errorLoggedRef = useRef(false);
 
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Don't try to fetch if we already know the table is missing
-      if (tableMissing) {
-        return;
-      }
-      
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*');
-
-      if (error) {
-        // Check if error is due to missing table
-        if (error.code === '42P01' && !errorLoggedRef.current) {
-          console.error('Categories table does not exist - using default categories:', error);
-          errorLoggedRef.current = true;
-          setTableMissing(true);
-          return;
-        }
-        throw error;
-      }
-
-      setCategories(data || DEFAULT_CATEGORIES);
+      const snapshot = await getDocs(collection(db, 'categories'));
+      const categoriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCategories(categoriesData);
     } catch (error) {
-      if (!errorLoggedRef.current) {
-        console.error('Error fetching categories - using default categories:', error);
-        errorLoggedRef.current = true;
-      }
-      // Use default categories on error
-      setCategories(DEFAULT_CATEGORIES);
+      console.error('Error fetching categories:', error);
     } finally {
       setLoading(false);
     }
-  }, [tableMissing]);
+  }, []);
 
   useEffect(() => { 
     fetchCategories(); 
@@ -70,16 +25,6 @@ export function useCategories() {
 
   const addCategory = async (category) => {
     try {
-      // If table is missing, just add to local state
-      if (tableMissing) {
-        const newCategory = { 
-          id: `local-${Date.now()}`, 
-          value: category.trim() 
-        };
-        setCategories(prev => [...prev, newCategory]);
-        return newCategory;
-      }
-      
       const trimmedCategory = category.trim();
       const exists = categories.some(existingCategory => 
         existingCategory.value.toLowerCase() === trimmedCategory.toLowerCase()
@@ -89,17 +34,10 @@ export function useCategories() {
         throw new Error(`Category "${trimmedCategory}" already exists`);
       }
       
-      const { data, error } = await supabase
-        .from('categories')
-        .insert([{ value: trimmedCategory }])
-        .select();
-      
-      if (error) {
-        throw error;
-      }
+      const docRef = await addDoc(collection(db, 'categories'), { value: trimmedCategory });
       
       // Add to local state immediately
-      const newCategory = data[0];
+      const newCategory = { id: docRef.id, value: trimmedCategory };
       setCategories(prev => [...prev, newCategory]);
       
       return newCategory;
@@ -109,62 +47,9 @@ export function useCategories() {
     }
   };
 
-  const updateCategory = async (id, newValue) => {
-    try {
-      // If table is missing, just update local state
-      if (tableMissing) {
-        setCategories(prev => prev.map(category => 
-          category.id === id ? { ...category, value: newValue.trim() } : category
-        ));
-        return;
-      }
-      
-      const trimmedValue = newValue.trim();
-      const exists = categories.some(existingCategory => 
-        existingCategory.value.toLowerCase() === trimmedValue.toLowerCase() && 
-        existingCategory.id !== id
-      );
-      
-      if (exists) {
-        throw new Error(`Category "${trimmedValue}" already exists`);
-      }
-      
-      const { error } = await supabase
-        .from('categories')
-        .update({ value: trimmedValue })
-        .eq('id', id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Update in local state
-      setCategories(prev => prev.map(category => 
-        category.id === id ? { ...category, value: trimmedValue } : category
-      ));
-    } catch (error) {
-      console.error('Error updating category:', error);
-      throw error;
-    }
-  };
-
   const deleteCategory = async (id) => {
     try {
-      // If table is missing, just update local state
-      if (tableMissing) {
-        setCategories(prev => prev.filter(category => category.id !== id));
-        return;
-      }
-      
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        throw error;
-      }
-      
+      await deleteDoc(doc(db, 'categories', id));
       setCategories(prev => prev.filter(category => category.id !== id));
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -174,10 +59,8 @@ export function useCategories() {
 
   return { 
     categories: categories.map(category => category.value), 
-    categoriesWithIds: categories,
     loading, 
-    addCategory,
-    updateCategory,
+    addCategory, 
     deleteCategory 
   };
 } 

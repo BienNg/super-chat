@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { studentServices } from '../utils/firebase-services';
 
 export function useStudents() {
   const [students, setStudents] = useState([]);
@@ -10,19 +10,9 @@ export function useStudents() {
     try {
       setLoading(true);
       setError(null);
-      
-      const { data, error: fetchError } = await supabase
-        .from('students')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      setStudents(data);
+      const studentsData = await studentServices.getStudents();
+      setStudents(studentsData);
     } catch (err) {
-      console.error('Error fetching students:', err);
       setError('Failed to fetch students');
     } finally {
       setLoading(false);
@@ -40,7 +30,7 @@ export function useStudents() {
       // Check for duplicate email if provided
       if (studentData.email) {
         const existingStudent = students.find(
-          student => student.email?.toLowerCase() === studentData.email.toLowerCase()
+          student => student.email.toLowerCase() === studentData.email.toLowerCase()
         );
         if (existingStudent) {
           // Don't set global error state for validation errors
@@ -49,33 +39,24 @@ export function useStudents() {
           throw validationError;
         }
       }
+
+      const docId = await studentServices.addStudent(studentData);
       
-      // Prepare student data with timestamps
-      const now = new Date().toISOString();
-      const newStudentData = {
+      // Create the student object for local state
+      const studentWithId = {
         ...studentData,
-        created_at: now,
-        updated_at: now
+        id: docId,
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
-      const { data, error: insertError } = await supabase
-        .from('students')
-        .insert([newStudentData])
-        .select();
-      
-      if (insertError) {
-        throw insertError;
-      }
-      
       // Add the new student to local state immediately for better UX
-      const newStudent = data[0];
-      setStudents(prev => [newStudent, ...prev]);
+      setStudents(prev => [studentWithId, ...prev]);
       
-      return newStudent.id;
+      return docId;
     } catch (err) {
       // Only set global error state for non-validation errors
       if (!err.isValidationError) {
-        console.error('Error adding student:', err);
         setError(err.message || 'Failed to add student');
       }
       throw err;
@@ -86,29 +67,15 @@ export function useStudents() {
     try {
       setError(null);
       
-      const now = new Date().toISOString();
-      const updatedData = {
-        ...updates,
-        updated_at: now
-      };
-      
-      const { error: updateError } = await supabase
-        .from('students')
-        .update(updatedData)
-        .eq('id', studentId);
-      
-      if (updateError) {
-        throw updateError;
-      }
+      await studentServices.updateStudent(studentId, updates);
       
       // Update local state
       setStudents(prev => prev.map(student => 
         student.id === studentId 
-          ? { ...student, ...updates, updated_at: now }
+          ? { ...student, ...updates, updatedAt: new Date() }
           : student
       ));
     } catch (err) {
-      console.error('Error updating student:', err);
       setError('Failed to update student');
       throw err;
     }
@@ -117,20 +84,11 @@ export function useStudents() {
   const deleteStudent = async (studentId) => {
     try {
       setError(null);
-      
-      const { error: deleteError } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', studentId);
-      
-      if (deleteError) {
-        throw deleteError;
-      }
+      await studentServices.deleteStudent(studentId);
       
       // Remove from local state
       setStudents(prev => prev.filter(student => student.id !== studentId));
     } catch (err) {
-      console.error('Error deleting student:', err);
       setError('Failed to delete student');
       throw err;
     }
@@ -146,21 +104,8 @@ export function useStudents() {
       }
 
       // If not in local state, fetch from database
-      const { data, error: fetchError } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', studentId)
-        .single();
-      
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      if (!data) {
-        throw new Error('Student not found');
-      }
-      
-      return data;
+      const student = await studentServices.getStudentById(studentId);
+      return student;
     } catch (err) {
       console.error('Error getting student by ID:', err);
       throw err;

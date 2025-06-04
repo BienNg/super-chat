@@ -1,4 +1,13 @@
-import { supabase } from './supabaseClient';
+import { 
+  collection, 
+  query, 
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc
+} from 'firebase/firestore';
+import { db } from '../firebase';
 
 /**
  * Migration utility to transition from classStudents to enrollments collection
@@ -6,128 +15,112 @@ import { supabase } from './supabaseClient';
 export const migrationUtils = {
   
   /**
-   * Migrate data from classStudents to enrollments table
+   * Migrate data from classStudents collection to enrollments collection
    * This function should be run once to migrate existing data
    */
   async migrateClassStudentsToEnrollments() {
     try {
       console.log('Starting migration from classStudents to enrollments...');
       
-      // Get all records from classStudents table
-      const { data: classStudents, error: fetchError } = await supabase
-        .from('class_students')
-        .select('*');
-      
-      if (fetchError) {
-        console.error('Error fetching class_students:', fetchError);
-        throw fetchError;
-      }
+      // Get all documents from classStudents collection
+      const classStudentsQuery = query(collection(db, 'classStudents'));
+      const classStudentsSnapshot = await getDocs(classStudentsQuery);
       
       const migrationResults = {
-        total: classStudents?.length || 0,
+        total: classStudentsSnapshot.docs.length,
         successful: 0,
         failed: 0,
         errors: []
       };
       
-      for (const classStudent of classStudents || []) {
+      for (const classStudentDoc of classStudentsSnapshot.docs) {
         try {
-          // Get additional data from referenced tables if available
+          const classStudentData = classStudentDoc.data();
+          
+          // Get additional data from referenced collections if available
           let studentData = {};
           let classData = {};
           let courseData = {};
           
           // Try to get student data if studentId exists
-          if (classStudent.student_id) {
+          if (classStudentData.studentId) {
             try {
-              const { data: student, error: studentError } = await supabase
-                .from('students')
-                .select('*')
-                .eq('id', classStudent.student_id)
-                .single();
-              
-              if (studentError) throw studentError;
-              if (student) studentData = student;
+              const studentDoc = await getDoc(doc(db, 'students', classStudentData.studentId));
+              if (studentDoc.exists()) {
+                studentData = studentDoc.data();
+              }
             } catch (err) {
-              console.warn('Could not fetch student data for:', classStudent.student_id);
+              console.warn('Could not fetch student data for:', classStudentData.studentId);
             }
           }
           
           // Try to get class data if classId exists
-          if (classStudent.class_id) {
+          if (classStudentData.classId) {
             try {
-              const { data: classRecord, error: classError } = await supabase
-                .from('classes')
-                .select('*')
-                .eq('id', classStudent.class_id)
-                .single();
-              
-              if (classError) throw classError;
-              if (classRecord) classData = classRecord;
+              const classDoc = await getDoc(doc(db, 'classes', classStudentData.classId));
+              if (classDoc.exists()) {
+                classData = classDoc.data();
+              }
             } catch (err) {
-              console.warn('Could not fetch class data for:', classStudent.class_id);
+              console.warn('Could not fetch class data for:', classStudentData.classId);
             }
           }
           
           // Create enrollment record with proper structure
           const enrollmentData = {
             // References
-            student_id: classStudent.student_id || null,
-            course_id: classStudent.course_id || null, // May not exist in old data
-            class_id: classStudent.class_id || null,
+            studentId: classStudentData.studentId || null,
+            courseId: classStudentData.courseId || null, // May not exist in old data
+            classId: classStudentData.classId || null,
             
             // Denormalized student data
-            student_name: classStudent.name || studentData.name || '',
-            student_email: classStudent.email || studentData.email || '',
+            studentName: classStudentData.name || studentData.name || '',
+            studentEmail: classStudentData.email || studentData.email || '',
             
             // Denormalized course data (may be limited in old data)
-            course_name: classStudent.course_name || courseData.course_name || classData.class_name || '',
-            course_level: classStudent.course_level || courseData.level || classData.level || '',
+            courseName: classStudentData.courseName || courseData.courseName || classData.className || '',
+            courseLevel: classStudentData.courseLevel || courseData.level || classData.level || '',
             
             // Denormalized class data
-            class_name: classStudent.class_name || classData.class_name || '',
+            className: classStudentData.className || classData.className || '',
             
             // Enrollment specific data
-            status: classStudent.status || 'active',
-            progress: classStudent.progress || 0,
-            attendance: classStudent.attendance || 0,
-            grade: classStudent.grade || null,
+            status: classStudentData.status || 'active',
+            progress: classStudentData.progress || 0,
+            attendance: classStudentData.attendance || 0,
+            grade: classStudentData.grade || null,
             
             // Payment information
-            amount: classStudent.amount || 0,
-            currency: classStudent.currency || 'VND',
-            payment_status: classStudent.payment_status || 'pending',
+            amount: classStudentData.amount || 0,
+            currency: classStudentData.currency || 'VND',
+            paymentStatus: classStudentData.paymentStatus || 'pending',
             
             // Dates
-            enrollment_date: classStudent.enrollment_date || classStudent.created_at || new Date().toISOString(),
-            start_date: classStudent.start_date || null,
-            end_date: classStudent.end_date || null,
-            completion_date: classStudent.completion_date || null,
+            enrollmentDate: classStudentData.enrollmentDate || classStudentData.createdAt || serverTimestamp(),
+            startDate: classStudentData.startDate || null,
+            endDate: classStudentData.endDate || null,
+            completionDate: classStudentData.completionDate || null,
             
             // Additional information
-            notes: classStudent.notes || '',
+            notes: classStudentData.notes || '',
             
             // Avatar data
-            avatar: classStudent.avatar || '',
-            avatar_color: classStudent.avatar_color || null,
+            avatar: classStudentData.avatar || '',
+            avatarColor: classStudentData.avatarColor || null,
             
             // Metadata
-            created_at: classStudent.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            created_by: classStudent.created_by || null,
+            createdAt: classStudentData.createdAt || serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            createdBy: classStudentData.createdBy || null,
             
             // Migration metadata
-            migrated_from: 'class_students',
-            original_id: classStudent.id,
-            migration_date: new Date().toISOString()
+            migratedFrom: 'classStudents',
+            originalId: classStudentDoc.id,
+            migrationDate: serverTimestamp()
           };
           
-          // Add to enrollments table
-          const { error: insertError } = await supabase
-            .from('enrollments')
-            .insert(enrollmentData);
-          
-          if (insertError) throw insertError;
+          // Add to enrollments collection
+          await addDoc(collection(db, 'enrollments'), enrollmentData);
           
           migrationResults.successful++;
           console.log(`Migrated record ${migrationResults.successful}/${migrationResults.total}`);
@@ -135,10 +128,10 @@ export const migrationUtils = {
         } catch (error) {
           migrationResults.failed++;
           migrationResults.errors.push({
-            docId: classStudent.id,
+            docId: classStudentDoc.id,
             error: error.message
           });
-          console.error('Error migrating record:', classStudent.id, error);
+          console.error('Error migrating document:', classStudentDoc.id, error);
         }
       }
       
@@ -156,23 +149,17 @@ export const migrationUtils = {
    */
   async checkMigrationStatus() {
     try {
-      const { count: classStudentsCount, error: classError } = await supabase
-        .from('class_students')
-        .select('*', { count: 'exact', head: true });
+      const classStudentsSnapshot = await getDocs(collection(db, 'classStudents'));
+      const enrollmentsSnapshot = await getDocs(collection(db, 'enrollments'));
       
-      if (classError) throw classError;
-      
-      const { count: enrollmentsCount, error: enrollError } = await supabase
-        .from('enrollments')
-        .select('*', { count: 'exact', head: true });
-      
-      if (enrollError) throw enrollError;
+      const classStudentsCount = classStudentsSnapshot.docs.length;
+      const enrollmentsCount = enrollmentsSnapshot.docs.length;
       
       return {
-        classStudentsCount: classStudentsCount || 0,
-        enrollmentsCount: enrollmentsCount || 0,
-        migrationNeeded: (classStudentsCount || 0) > 0 && (enrollmentsCount || 0) === 0,
-        migrationRecommended: (classStudentsCount || 0) > (enrollmentsCount || 0)
+        classStudentsCount,
+        enrollmentsCount,
+        migrationNeeded: classStudentsCount > 0 && enrollmentsCount === 0,
+        migrationRecommended: classStudentsCount > enrollmentsCount
       };
     } catch (error) {
       console.error('Error checking migration status:', error);
@@ -184,7 +171,7 @@ export const migrationUtils = {
    * Validate enrollment data structure
    */
   validateEnrollmentData(enrollmentData) {
-    const requiredFields = ['student_id', 'student_name'];
+    const requiredFields = ['studentId', 'studentName'];
     const missingFields = requiredFields.filter(field => !enrollmentData[field]);
     
     if (missingFields.length > 0) {
@@ -214,20 +201,20 @@ export const migrationUtils = {
    */
   createSampleEnrollment(overrides = {}) {
     return {
-      student_id: 'sample-student-id',
-      course_id: 'sample-course-id',
-      class_id: 'sample-class-id',
-      student_name: 'John Doe',
-      student_email: 'john.doe@example.com',
-      course_name: 'Sample Course',
-      course_level: 'Beginner',
-      class_name: 'Sample Class',
+      studentId: 'sample-student-id',
+      courseId: 'sample-course-id',
+      classId: 'sample-class-id',
+      studentName: 'John Doe',
+      studentEmail: 'john.doe@example.com',
+      courseName: 'Sample Course',
+      courseLevel: 'Beginner',
+      className: 'Sample Class',
       status: 'active',
       progress: 0,
       attendance: 0,
       amount: 1000000,
       currency: 'VND',
-      payment_status: 'pending',
+      paymentStatus: 'pending',
       notes: 'Sample enrollment for testing',
       ...overrides
     };

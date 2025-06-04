@@ -11,7 +11,8 @@ import { usePlatforms } from '../../../hooks/usePlatforms';
 import { useCategories } from '../../../hooks/useCategories';
 import { useClasses } from '../../../hooks/useClasses';
 import { useEnrollments } from '../../../hooks/useEnrollments';
-import { SupabaseCollectionSelector, SupabaseMultiSelectSelector, ActionsDropdown } from '../../shared/index.js';
+import FirebaseCollectionSelector from '../../shared/FirebaseCollectionSelector.jsx';
+import { FirebaseMultiSelectSelector, ActionsDropdown } from '../../shared/index.js';
 
 const StudentsInterface = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,11 +95,11 @@ const StudentsInterface = () => {
         const enrollmentUpdates = {};
         
         if (updates.name) {
-          enrollmentUpdates.student_name = updates.name;
+          enrollmentUpdates.studentName = updates.name;
         }
         
         if (updates.email) {
-          enrollmentUpdates.student_email = updates.email;
+          enrollmentUpdates.studentEmail = updates.email;
         }
         
         // Only update if there are relevant changes
@@ -437,8 +438,8 @@ const StudentsInterface = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap w-32 h-20" onClick={(e) => e.stopPropagation()}>
-                    <SupabaseCollectionSelector
-                      tableName="countries"
+                    <FirebaseCollectionSelector
+                      collectionName="countries"
                       record={student}
                       updateRecord={updateStudent}
                       fieldName="location"
@@ -449,8 +450,8 @@ const StudentsInterface = () => {
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap w-32 h-20" onClick={(e) => e.stopPropagation()}>
-                    <SupabaseCollectionSelector
-                      tableName="cities"
+                    <FirebaseCollectionSelector
+                      collectionName="cities"
                       record={student}
                       updateRecord={updateStudent}
                       fieldName="city"
@@ -461,8 +462,8 @@ const StudentsInterface = () => {
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap w-32 h-20" onClick={(e) => e.stopPropagation()}>
-                    <SupabaseMultiSelectSelector
-                      tableName="categories"
+                    <FirebaseMultiSelectSelector
+                      collectionName="categories"
                       record={student}
                       updateRecord={updateStudent}
                       fieldName="categories"
@@ -479,8 +480,8 @@ const StudentsInterface = () => {
                     {/* Empty Payments column */}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap w-32 h-20" onClick={(e) => e.stopPropagation()}>
-                    <SupabaseCollectionSelector
-                      tableName="platforms"
+                    <FirebaseCollectionSelector
+                      collectionName="platforms"
                       record={student}
                       updateRecord={updateStudent}
                       fieldName="platform"

@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../utils/supabaseClient';
-import { useAuth } from '../contexts/SupabaseAuthContext';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+  getDoc 
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useEnrollments = () => {
   const [enrollments, setEnrollments] = useState([]);
@@ -11,7 +24,7 @@ export const useEnrollments = () => {
 
   // Fetch all enrollments
   const fetchEnrollments = useCallback(async () => {
-    if (!currentUser?.id) {
+    if (!currentUser?.uid) {
       setEnrollments([]);
       setLoading(false);
       return;
@@ -21,90 +34,55 @@ export const useEnrollments = () => {
       setLoading(true);
       setError(null);
       
-      const { data, error: fetchError } = await supabase
-        .from('enrollments')
-        .select('*')
-        .order('enrollment_date', { ascending: false });
+      const enrollmentsQuery = query(
+        collection(db, 'enrollments'),
+        orderBy('enrollmentDate', 'desc')
+      );
       
-      if (fetchError) {
-        throw fetchError;
-      }
+      const snapshot = await getDocs(enrollmentsQuery);
+      const enrollmentsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        enrollmentDate: doc.data().enrollmentDate?.toDate?.() || new Date(),
+        createdAt: doc.data().createdAt?.toDate?.() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate?.() || new Date()
+      }));
       
-      setEnrollments(data || []);
+      setEnrollments(enrollmentsData);
     } catch (err) {
       console.error('Error fetching enrollments:', err);
       setError('Failed to fetch enrollments');
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     fetchEnrollments();
   }, [fetchEnrollments]);
 
   // Get enrollments for a specific student
-  const getStudentEnrollments = useCallback(async (studentId) => {
+  const getStudentEnrollments = useCallback((studentId) => {
     if (!studentId) return [];
     
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('student_id', studentId);
-      
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching student enrollments:', err);
-      throw err;
-    }
-  }, []);
+    return enrollments.filter(enrollment => 
+      enrollment.studentId === studentId
+    );
+  }, [enrollments]);
 
   // Get enrollments for a specific course
-  const getCourseEnrollments = useCallback(async (courseId) => {
+  const getCourseEnrollments = useCallback((courseId) => {
     if (!courseId) return [];
     
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('course_id', courseId);
-      
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching course enrollments:', err);
-      throw err;
-    }
-  }, []);
+    return enrollments.filter(enrollment => enrollment.courseId === courseId);
+  }, [enrollments]);
 
   // Get enrollments for a specific class
-  const getClassEnrollments = useCallback(async (classId) => {
+  const getClassEnrollments = useCallback((classId) => {
     if (!classId) return [];
     
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('class_id', classId);
-      
-      if (fetchError) {
-        throw fetchError;
-      }
-      
-      return data || [];
-    } catch (err) {
-      console.error('Error fetching class enrollments:', err);
-      throw err;
-    }
-  }, []);
+    return enrollments.filter(enrollment => enrollment.classId === classId);
+  }, [enrollments]);
 
   // Enroll a student in a course
   const enrollStudent = async (enrollmentData) => {
@@ -115,96 +93,91 @@ export const useEnrollments = () => {
       console.log('Current user:', currentUser);
       
       // Validate required fields
-      if (!enrollmentData.student_id) {
+      if (!enrollmentData.studentId) {
         throw new Error('Student ID is required for enrollment');
       }
       
-      if (!enrollmentData.student_name) {
+      if (!enrollmentData.studentName) {
         throw new Error('Student name is required for enrollment');
       }
       
-      if (!currentUser?.id) {
+      if (!currentUser?.uid) {
         throw new Error('User must be authenticated to enroll students');
       }
       
       // Check if student is already enrolled in this course
-      const { data: existingEnrollment, error: checkError } = await supabase
-        .from('enrollments')
-        .select('*')
-        .eq('student_id', enrollmentData.student_id)
-        .eq('course_id', enrollmentData.course_id)
-        .maybeSingle();
-      
-      if (checkError) {
-        throw checkError;
-      }
+      const existingEnrollment = enrollments.find(
+        enrollment => 
+          enrollment.studentId === enrollmentData.studentId && 
+          enrollment.courseId === enrollmentData.courseId
+      );
       
       if (existingEnrollment) {
         throw new Error('Student is already enrolled in this course');
       }
       
-      const now = new Date().toISOString();
+      const timestamp = serverTimestamp();
       const newEnrollment = {
-        student_id: enrollmentData.student_id, 
-        course_id: enrollmentData.course_id,
-        class_id: enrollmentData.class_id,
+        studentId: enrollmentData.studentId, // Reference to students collection
+        courseId: enrollmentData.courseId, // Reference to courses collection
+        classId: enrollmentData.classId, // Reference to classes collection
         
-        // Denormalized student data
-        student_name: enrollmentData.student_name,
-        student_email: enrollmentData.student_email,
+        // Denormalized student data for efficient queries
+        studentName: enrollmentData.studentName,
+        studentEmail: enrollmentData.studentEmail,
         
-        // Denormalized course data
-        course_name: enrollmentData.course_name,
-        course_level: enrollmentData.course_level,
+        // Denormalized course data for efficient queries
+        courseName: enrollmentData.courseName,
+        courseLevel: enrollmentData.courseLevel,
         
-        // Denormalized class data
-        class_name: enrollmentData.class_name,
+        // Denormalized class data for efficient queries
+        className: enrollmentData.className,
         
         // Enrollment specific data
-        status: enrollmentData.status || 'active',
-        progress: enrollmentData.progress || 0,
-        attendance: enrollmentData.attendance || 0,
-        grade: enrollmentData.grade || null,
+        status: enrollmentData.status || 'active', // active, completed, dropped, suspended
+        progress: enrollmentData.progress || 0, // 0-100
+        attendance: enrollmentData.attendance || 0, // 0-100
+        grade: enrollmentData.grade || null, // Final grade
         
         // Payment information
         amount: enrollmentData.amount || 0,
         currency: enrollmentData.currency || 'VND',
-        payment_status: enrollmentData.payment_status || 'pending',
-        payment_id: enrollmentData.payment_id || null,
+        paymentStatus: enrollmentData.paymentStatus || 'pending', // pending, paid, partial, overdue
+        paymentId: enrollmentData.paymentId || null, // Reference to payments collection
         
         // Dates
-        enrollment_date: now,
-        start_date: enrollmentData.start_date || null,
-        end_date: enrollmentData.end_date || null,
-        completion_date: enrollmentData.completion_date || null,
+        enrollmentDate: timestamp,
+        startDate: enrollmentData.startDate || null,
+        endDate: enrollmentData.endDate || null,
+        completionDate: enrollmentData.completionDate || null,
         
         // Additional information
         notes: enrollmentData.notes || '',
         
         // Metadata
-        created_at: now,
-        updated_at: now,
-        created_by: currentUser.id
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        createdBy: currentUser.uid
       };
       
-      console.log('Creating enrollment record:', newEnrollment);
+      console.log('Creating enrollment document:', newEnrollment);
       
-      const { data, error: insertError } = await supabase
-        .from('enrollments')
-        .insert([newEnrollment])
-        .select();
+      const docRef = await addDoc(collection(db, 'enrollments'), newEnrollment);
       
-      if (insertError) {
-        throw insertError;
-      }
-      
-      console.log('Enrollment created successfully:', data[0]);
+      console.log('Enrollment created successfully with ID:', docRef.id);
       
       // Add to local state immediately for better UX
-      const newEnrollmentRecord = data[0];
-      setEnrollments(prev => [newEnrollmentRecord, ...prev]);
+      const enrollmentWithId = {
+        ...newEnrollment,
+        id: docRef.id,
+        enrollmentDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
       
-      return newEnrollmentRecord.id;
+      setEnrollments(prev => [enrollmentWithId, ...prev]);
+      
+      return docRef.id;
     } catch (err) {
       console.error('Error enrolling student:', err);
       console.error('Enrollment data that failed:', enrollmentData);
@@ -219,25 +192,17 @@ export const useEnrollments = () => {
     try {
       setError(null);
       
-      const now = new Date().toISOString();
       const updateData = {
         ...updates,
-        updated_at: now
+        updatedAt: serverTimestamp()
       };
 
-      const { error: updateError } = await supabase
-        .from('enrollments')
-        .update(updateData)
-        .eq('id', enrollmentId);
-      
-      if (updateError) {
-        throw updateError;
-      }
+      await updateDoc(doc(db, 'enrollments', enrollmentId), updateData);
       
       // Update local state
       setEnrollments(prev => prev.map(enrollment => 
         enrollment.id === enrollmentId 
-          ? { ...enrollment, ...updates, updated_at: now }
+          ? { ...enrollment, ...updates, updatedAt: new Date() }
           : enrollment
       ));
     } catch (err) {
@@ -273,8 +238,8 @@ export const useEnrollments = () => {
       const updateData = { status, ...additionalData };
       
       // If completing the course, set completion date
-      if (status === 'completed' && !additionalData.completion_date) {
-        updateData.completion_date = new Date().toISOString();
+      if (status === 'completed' && !additionalData.completionDate) {
+        updateData.completionDate = new Date();
       }
       
       await updateEnrollment(enrollmentId, updateData);
@@ -284,126 +249,241 @@ export const useEnrollments = () => {
     }
   };
 
-  // Delete enrollment
+  // Remove enrollment
   const removeEnrollment = async (enrollmentId) => {
     try {
       setError(null);
-      
-      const { error: deleteError } = await supabase
-        .from('enrollments')
-        .delete()
-        .eq('id', enrollmentId);
-      
-      if (deleteError) {
-        throw deleteError;
-      }
+      await deleteDoc(doc(db, 'enrollments', enrollmentId));
       
       // Remove from local state
       setEnrollments(prev => prev.filter(enrollment => enrollment.id !== enrollmentId));
     } catch (err) {
-      console.error('Error deleting enrollment:', err);
-      setError('Failed to delete enrollment');
+      console.error('Error removing enrollment:', err);
+      setError('Failed to remove enrollment');
       throw err;
     }
   };
+
+  // Get enrollment statistics
+  const getEnrollmentStats = useCallback(() => {
+    const totalEnrollments = enrollments.length;
+    const activeEnrollments = enrollments.filter(e => e.status === 'active').length;
+    const completedEnrollments = enrollments.filter(e => e.status === 'completed').length;
+    const droppedEnrollments = enrollments.filter(e => e.status === 'dropped').length;
+    const suspendedEnrollments = enrollments.filter(e => e.status === 'suspended').length;
+    
+    const averageProgress = enrollments.length > 0 
+      ? Math.round(enrollments.reduce((acc, e) => acc + (e.progress || 0), 0) / enrollments.length)
+      : 0;
+    
+    const averageAttendance = enrollments.length > 0 
+      ? Math.round(enrollments.reduce((acc, e) => acc + (e.attendance || 0), 0) / enrollments.length)
+      : 0;
+    
+    return {
+      total: totalEnrollments,
+      active: activeEnrollments,
+      completed: completedEnrollments,
+      dropped: droppedEnrollments,
+      suspended: suspendedEnrollments,
+      averageProgress,
+      averageAttendance
+    };
+  }, [enrollments]);
+
+  // Search enrollments
+  const searchEnrollments = useCallback((searchTerm, filters = {}) => {
+    let filtered = enrollments;
+
+    // Apply search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(enrollment =>
+        enrollment.studentName?.toLowerCase().includes(term) ||
+        enrollment.studentEmail?.toLowerCase().includes(term) ||
+        enrollment.courseName?.toLowerCase().includes(term) ||
+        enrollment.className?.toLowerCase().includes(term) ||
+        enrollment.courseLevel?.toLowerCase().includes(term)
+      );
+    }
+
+    // Apply filters
+    if (filters.status) {
+      filtered = filtered.filter(enrollment => enrollment.status === filters.status);
+    }
+
+    if (filters.courseId) {
+      filtered = filtered.filter(enrollment => enrollment.courseId === filters.courseId);
+    }
+
+    if (filters.classId) {
+      filtered = filtered.filter(enrollment => enrollment.classId === filters.classId);
+    }
+
+    if (filters.studentId) {
+      filtered = filtered.filter(enrollment => enrollment.studentId === filters.studentId);
+    }
+
+    if (filters.paymentStatus) {
+      filtered = filtered.filter(enrollment => enrollment.paymentStatus === filters.paymentStatus);
+    }
+
+    return filtered;
+  }, [enrollments]);
+
+  // Get enrollment by ID
+  const getEnrollmentById = useCallback((enrollmentId) => {
+    return enrollments.find(enrollment => enrollment.id === enrollmentId);
+  }, [enrollments]);
+
+  // Check if student is enrolled in course
+  const isStudentEnrolled = useCallback((studentId, courseId) => {
+    return enrollments.some(enrollment => 
+      enrollment.studentId === studentId && 
+      enrollment.courseId === courseId &&
+      enrollment.status !== 'dropped'
+    );
+  }, [enrollments]);
+
+  // Get payment information for enrollment
+  const getEnrollmentPayment = useCallback(async (enrollmentId) => {
+    try {
+      const enrollment = enrollments.find(e => e.id === enrollmentId);
+      if (!enrollment?.paymentId) return null;
+
+      const paymentDoc = await getDoc(doc(db, 'payments', enrollment.paymentId));
+      if (!paymentDoc.exists()) return null;
+
+      return {
+        id: paymentDoc.id,
+        ...paymentDoc.data(),
+        createdAt: paymentDoc.data().createdAt?.toDate?.() || new Date(),
+        updatedAt: paymentDoc.data().updatedAt?.toDate?.() || new Date(),
+        paymentDate: paymentDoc.data().paymentDate?.toDate?.() || new Date()
+      };
+    } catch (error) {
+      console.error('Error fetching enrollment payment:', error);
+      return null;
+    }
+  }, [enrollments]);
 
   // Create enrollment with payment
   const createEnrollmentWithPayment = async (enrollmentData, paymentData) => {
     try {
       setError(null);
       
-      // First create the payment record
-      const now = new Date().toISOString();
-      const newPayment = {
-        student_id: enrollmentData.student_id,
-        course_id: enrollmentData.course_id,
-        amount: paymentData.amount,
-        currency: paymentData.currency || 'VND',
-        payment_method: paymentData.payment_method,
-        status: paymentData.status || 'completed',
-        transaction_id: paymentData.transaction_id,
-        payment_date: paymentData.payment_date || now,
-        notes: paymentData.notes || '',
-        created_at: now,
-        created_by: currentUser.id
+      // First create the payment
+      const paymentDoc = {
+        ...paymentData,
+        studentId: enrollmentData.studentId,
+        courseId: enrollmentData.courseId,
+        classId: enrollmentData.classId,
+        studentName: enrollmentData.studentName,
+        studentEmail: enrollmentData.studentEmail,
+        courseName: enrollmentData.courseName,
+        enrollmentId: null, // Will be updated after enrollment creation
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: currentUser.uid
       };
+
+      const paymentRef = await addDoc(collection(db, 'payments'), paymentDoc);
       
-      const { data: paymentData, error: paymentError } = await supabase
-        .from('payments')
-        .insert([newPayment])
-        .select();
-      
-      if (paymentError) {
-        throw paymentError;
-      }
-      
-      const paymentId = paymentData[0].id;
-      
-      // Then create the enrollment with the payment info
+      // Create enrollment with payment reference
       const enrollmentWithPayment = {
         ...enrollmentData,
-        payment_id: paymentId,
-        payment_status: 'paid'
+        paymentId: paymentRef.id,
+        paymentStatus: paymentData.status || 'pending',
+        amount: paymentData.amount || 0,
+        currency: paymentData.currency || 'VND'
       };
-      
+
       const enrollmentId = await enrollStudent(enrollmentWithPayment);
-      
-      return { enrollmentId, paymentId };
-    } catch (err) {
-      console.error('Error creating enrollment with payment:', err);
-      setError('Failed to create enrollment with payment');
-      throw err;
+
+      // Update payment with enrollment reference
+      await updateDoc(doc(db, 'payments', paymentRef.id), {
+        enrollmentId: enrollmentId,
+        updatedAt: serverTimestamp()
+      });
+
+      return { enrollmentId, paymentId: paymentRef.id };
+    } catch (error) {
+      console.error('Error creating enrollment with payment:', error);
+      throw error;
     }
   };
 
-  // Update payment status
+  // Update payment status and sync with enrollment
   const updatePaymentStatus = async (enrollmentId, paymentStatus, paymentData = {}) => {
     try {
-      // First update the enrollment's payment status
-      await updateEnrollment(enrollmentId, { payment_status: paymentStatus });
-      
-      // Get the enrollment to access the payment ID
-      const { data: enrollment, error: fetchError } = await supabase
-        .from('enrollments')
-        .select('payment_id')
-        .eq('id', enrollmentId)
-        .single();
-      
-      if (fetchError) {
-        throw fetchError;
+      const enrollment = enrollments.find(e => e.id === enrollmentId);
+      if (!enrollment) throw new Error('Enrollment not found');
+
+      // Update enrollment payment status
+      await updateEnrollment(enrollmentId, { 
+        paymentStatus,
+        ...paymentData.enrollmentUpdates
+      });
+
+      // Update payment if it exists
+      if (enrollment.paymentId && paymentData.paymentUpdates) {
+        await updateDoc(doc(db, 'payments', enrollment.paymentId), {
+          ...paymentData.paymentUpdates,
+          updatedAt: serverTimestamp()
+        });
       }
-      
-      const paymentId = enrollment.payment_id;
-      
-      // If there's a payment ID and payment data, update the payment record
-      if (paymentId && Object.keys(paymentData).length > 0) {
-        const now = new Date().toISOString();
-        const updateData = {
-          ...paymentData,
-          updated_at: now,
-          status: paymentStatus
-        };
-        
-        const { error: updateError } = await supabase
-          .from('payments')
-          .update(updateData)
-          .eq('id', paymentId);
-        
-        if (updateError) {
-          throw updateError;
-        }
-      }
-    } catch (err) {
-      console.error('Error updating payment status:', err);
-      throw err;
+
+      return true;
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      throw error;
     }
   };
+
+  // Get enriched enrollments with payment data for display
+  const getEnrichedEnrollments = useCallback(async (courseId) => {
+    try {
+      const courseEnrollments = getCourseEnrollments(courseId);
+      
+      const enrichedEnrollments = await Promise.all(
+        courseEnrollments.map(async (enrollment) => {
+          let paymentInfo = null;
+          
+          if (enrollment.paymentId) {
+            try {
+              const paymentDoc = await getDoc(doc(db, 'payments', enrollment.paymentId));
+              if (paymentDoc.exists()) {
+                paymentInfo = {
+                  id: paymentDoc.id,
+                  ...paymentDoc.data(),
+                  createdAt: paymentDoc.data().createdAt?.toDate?.() || new Date(),
+                  updatedAt: paymentDoc.data().updatedAt?.toDate?.() || new Date(),
+                  paymentDate: paymentDoc.data().paymentDate?.toDate?.() || new Date()
+                };
+              }
+            } catch (error) {
+              console.warn('Error fetching payment for enrollment:', enrollment.id, error);
+            }
+          }
+
+          return {
+            ...enrollment,
+            payment: paymentInfo
+          };
+        })
+      );
+
+      return enrichedEnrollments;
+    } catch (error) {
+      console.error('Error getting enriched enrollments:', error);
+      return getCourseEnrollments(courseId);
+    }
+  }, [getCourseEnrollments]);
 
   return {
     enrollments,
     loading,
     error,
-    fetchEnrollments,
     getStudentEnrollments,
     getCourseEnrollments,
     getClassEnrollments,
@@ -413,7 +493,14 @@ export const useEnrollments = () => {
     updateStudentAttendance,
     updateEnrollmentStatus,
     removeEnrollment,
+    getEnrollmentStats,
+    searchEnrollments,
+    getEnrollmentById,
+    isStudentEnrolled,
+    getEnrollmentPayment,
     createEnrollmentWithPayment,
-    updatePaymentStatus
+    updatePaymentStatus,
+    getEnrichedEnrollments,
+    refetch: fetchEnrollments
   };
 }; 

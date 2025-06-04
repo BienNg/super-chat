@@ -3,7 +3,7 @@ import { X, User, Mail, Phone, MapPin, GraduationCap, MessageSquare, AlertCircle
 import CustomSelect from './CustomSelect';
 import MultiSelect from './MultiSelect';
 import OptionSettingsModal from './OptionSettingsModal';
-import { useCategories } from '../../../hooks/useCategories';
+import { useFunnelSteps } from '../../../hooks/useFunnelSteps';
 import { usePlatforms } from '../../../hooks/usePlatforms';
 import { useCountries } from '../../../hooks/useCountries';
 import { useCities } from '../../../hooks/useCities';
@@ -16,7 +16,8 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
     location: '',
     city: '',
     categories: [],
-    platform: '',
+    platform: [],
+    courses: [],
     notes: ''
   });
 
@@ -26,7 +27,7 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
   const [settingsModal, setSettingsModal] = useState({ isOpen: false, type: '', title: '' });
 
   // Database hooks for dynamic options
-  const { categories, categoriesWithIds, addCategory, updateCategory, deleteCategory } = useCategories();
+  const { funnelSteps: categories, funnelStepsWithIds: categoriesWithIds, addFunnelStep: addCategory, updateFunnelStep: updateCategory, deleteFunnelStep: deleteCategory } = useFunnelSteps();
   const { platforms, addPlatform } = usePlatforms();
   const { countries, addCountry } = useCountries();
   const { cities, addCity } = useCities();
@@ -56,7 +57,7 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
 
     try {
       switch (optionType) {
-        case 'categories':
+        case 'funnelSteps':
           await addCategory(newOption);
           break;
         case 'platforms':
@@ -167,12 +168,11 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
         location: formData.location,
         city: formData.city,
         categories: formData.categories,
-        platform: formData.platform,
+        platform: formData.platform.join(', '),
+        courses: [],
         notes: formData.notes.trim(),
         avatar,
-        avatar_color: avatarColor,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        avatarColor
       };
 
       await onSubmit(newStudent);
@@ -185,7 +185,8 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
         location: '',
         city: '',
         categories: [],
-        platform: '',
+        platform: [],
+        courses: [],
         notes: ''
       });
       
@@ -247,208 +248,183 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit }) => {
             <div className="p-6 space-y-8">
               {/* Submit Error Message */}
               {submitError && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">{submitError}</p>
-                    <p className="text-xs mt-1">Please try again or contact support if the issue persists.</p>
-                  </div>
+                <div className="flex items-center space-x-2 p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <span className="text-sm text-red-700">{submitError}</span>
                 </div>
               )}
 
-              {/* Student Info */}
-              <div className="space-y-4">
-                <h3 className="text-base font-medium text-gray-900">Student Information</h3>
+              {/* Personal Information */}
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <User className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-lg font-medium text-gray-900">Personal Information</h3>
+                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Name Field */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Full Name *
                     </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        className={`block w-full pl-10 pr-3 py-2 border ${
-                          errors.name ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
-                        } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1`}
-                        placeholder="John Doe"
-                      />
-                    </div>
-                    {errors.name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                    )}
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                        errors.name ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter student's full name"
+                    />
+                    {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
                   </div>
 
-                  {/* Email Field */}
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email Address
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail className="h-5 w-5 text-gray-400" />
-                      </div>
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <input
                         type="email"
-                        id="email"
-                        name="email"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
-                        className={`block w-full pl-10 pr-3 py-2 border ${
-                          errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
-                        } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1`}
-                        placeholder="john.doe@example.com"
+                        className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                          errors.email ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="student@example.com"
                       />
                     </div>
-                    {errors.email && (
-                      <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                    )}
+                    {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
                   </div>
 
-                  {/* Phone Field */}
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone Number
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Phone className="h-5 w-5 text-gray-400" />
-                      </div>
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <input
                         type="tel"
-                        id="phone"
-                        name="phone"
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="+1 (555) 123-4567"
+                        className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                          errors.phone ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="+84 901 234 567"
                       />
                     </div>
+                    {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
                   </div>
 
-                  {/* Category Field */}
                   <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label htmlFor="categories" className="block text-sm font-medium text-gray-700">
-                        Category
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenSettings('categories', 'Categories')}
-                        className="text-xs text-indigo-600 hover:text-indigo-800"
-                      >
-                        Manage
-                      </button>
-                    </div>
                     <MultiSelect
+                      label="Category"
                       value={formData.categories}
-                      onChange={(val) => handleInputChange('categories', val)}
+                      onChange={(value) => handleInputChange('categories', value)}
                       options={categories}
-                      onAddNew={(val) => handleAddNewOption('categories', val)}
                       placeholder="Select categories"
-                    />
-                  </div>
-
-                  {/* Country Field */}
-                  <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-                      Country *
-                    </label>
-                    <CustomSelect
-                      value={formData.location}
-                      onChange={(val) => handleInputChange('location', val)}
-                      options={countries}
-                      onAddNew={(val) => handleAddNewOption('countries', val)}
                       allowAddNew={true}
-                      hasError={!!errors.location}
-                      placeholder="Select country"
-                    />
-                    {errors.location && (
-                      <p className="mt-1 text-sm text-red-600">{errors.location}</p>
-                    )}
-                  </div>
-
-                  {/* City Field */}
-                  <div>
-                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                      City
-                    </label>
-                    <CustomSelect
-                      value={formData.city}
-                      onChange={(val) => handleInputChange('city', val)}
-                      options={cities}
-                      onAddNew={(val) => handleAddNewOption('cities', val)}
-                      allowAddNew={true}
-                      placeholder="Select city"
-                    />
-                  </div>
-
-                  {/* Platform Field */}
-                  <div>
-                    <label htmlFor="platform" className="block text-sm font-medium text-gray-700 mb-1">
-                      Platform
-                    </label>
-                    <CustomSelect
-                      value={formData.platform}
-                      onChange={(val) => handleInputChange('platform', val)}
-                      options={platforms}
-                      onAddNew={(val) => handleAddNewOption('platforms', val)}
-                      allowAddNew={true}
-                      placeholder="Select platform"
+                      onAddNew={(newOption) => handleAddNewOption('funnelSteps', newOption)}
+                      addNewLabel="New Category..."
+                      onOpenSettings={() => handleOpenSettings('categories', 'Categories')}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Notes Section */}
-              <div className="space-y-4">
-                <h3 className="text-base font-medium text-gray-900">Additional Notes</h3>
+              {/* Location Information */}
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <MapPin className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-lg font-medium text-gray-900">Location</h3>
+                </div>
                 
-                <div>
-                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <div className="relative">
-                    <div className="absolute top-3 left-3 flex items-start pointer-events-none">
-                      <MessageSquare className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      rows={4}
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange('notes', e.target.value)}
-                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Add any additional notes about the student..."
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <CustomSelect
+                      label="Country"
+                      value={formData.location}
+                      onChange={(value) => handleInputChange('location', value)}
+                      options={countries}
+                      placeholder="Select country"
+                      required={true}
+                      error={errors.location}
+                      allowAddNew={true}
+                      onAddNew={(newOption) => handleAddNewOption('countries', newOption)}
+                      addNewLabel="New Country..."
                     />
                   </div>
+
+                  <div>
+                    <CustomSelect
+                      label="City"
+                      value={formData.city}
+                      onChange={(value) => handleInputChange('city', value)}
+                      options={cities}
+                      placeholder="Select city"
+                      allowAddNew={true}
+                      onAddNew={(newOption) => handleAddNewOption('cities', newOption)}
+                      addNewLabel="New City..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Course Information */}
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <GraduationCap className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-lg font-medium text-gray-900">Course Information</h3>
+                </div>
+                
+                <div>
+                  <MultiSelect
+                    label="Platform"
+                    value={formData.platform}
+                    onChange={(value) => handleInputChange('platform', value)}
+                    options={platforms}
+                    placeholder="Search and select platforms..."
+                    allowAddNew={true}
+                    onAddNew={(newOption) => handleAddNewOption('platforms', newOption)}
+                  />
+                </div>
+              </div>
+
+              {/* Additional Information */}
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <MessageSquare className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-lg font-medium text-gray-900">Additional Information</h3>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
+                    placeholder="Add any additional notes about the student..."
+                  />
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 border-t border-gray-200">
+            <div className="flex items-center justify-end space-x-4 p-6 border-t border-gray-200 bg-gray-50">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors ${
-                  isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
+                className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Creating...' : 'Create Student'}
               </button>

@@ -1,5 +1,16 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../supabaseClient'; // Import Supabase client
+import { 
+    collection, 
+    query, 
+    where, 
+    getDocs,
+    addDoc,
+    setDoc,
+    serverTimestamp,
+    doc,
+    getDoc
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -10,149 +21,132 @@ export const useDirectMessages = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     
-    const { currentUser, userProfile } = useAuth(); // userProfile from AuthContext (Supabase 'profiles' table)
+    const { currentUser, userProfile } = useAuth();
 
+    // Create or find existing DM channel between two users
     const createOrFindDMChannel = useCallback(async (otherUserId, otherUserData) => {
-        const currentUserId = currentUser?.id;
-        if (!currentUserId || !otherUserId || currentUserId === otherUserId) {
-            // setError('Invalid users for DM channel'); // Optionally set error state
+        if (!currentUser?.uid || !otherUserId || currentUser.uid === otherUserId) {
             throw new Error('Invalid users for DM channel');
         }
 
-        setLoading(true);
-        setError(null);
-
         try {
-            // Ensure members are always ordered consistently for querying (e.g., by ID)
-            const membersArray = [currentUserId, otherUserId].sort();
+            setLoading(true);
+            setError(null);
 
-            // Check if a DM channel already exists between these two users
-            const { data: existingChannels, error: findError } = await supabase
-                .from('channels')
-                .select('*')
-                .eq('is_dm', true)
-                // .eq('type', 'direct-message') // Alternative or additional check for DM type
-                .contains('members', membersArray) // Check if members array contains both (order might matter depending on DB)
-                // A more robust query might be to check if members array *equals* membersArray after sorting,
-                // or use array operators if members is a native array type in PG.
-                // For JSONB, you might need a function or more complex query if order isn't guaranteed or if there are extra members.
-                // Simplest for now: fetch channels containing both, then filter client-side for exact match of 2 members.
-
-            if (findError) throw findError;
-
-            const exactDMChannel = existingChannels?.find(ch => 
-                ch.members.length === 2 && 
-                ch.members.includes(currentUserId) && 
-                ch.members.includes(otherUserId)
+            // First, check if a DM channel already exists using a query
+            const dmChannelsQuery = query(
+                collection(db, 'channels'),
+                where('isDM', '==', true),
+                where('members', 'array-contains', currentUser.uid)
             );
 
-            if (exactDMChannel) {
-                setLoading(false);
-                return exactDMChannel;
+            const existingChannelsSnapshot = await getDocs(dmChannelsQuery);
+            const existingDMChannel = existingChannelsSnapshot.docs.find(doc => {
+                const data = doc.data();
+                return data.members && data.members.includes(otherUserId);
+            });
+
+            if (existingDMChannel) {
+                return {
+                    id: existingDMChannel.id,
+                    ...existingDMChannel.data()
+                };
             }
 
             // Create new DM channel
-            const currentTimestamp = new Date().toISOString();
-            const currentUserDisplayData = {
-                id: currentUserId,
-                display_name: userProfile?.display_name || currentUser?.email?.split('@')[0],
-                email: currentUser?.email,
-                avatar_url: userProfile?.avatar_url || null // Assuming avatar_url from profiles
-            };
-
-            const otherUserDisplayData = {
-                id: otherUserId,
-                display_name: otherUserData?.display_name || otherUserData?.email?.split('@')[0],
-                email: otherUserData?.email,
-                avatar_url: otherUserData?.avatar_url || null
+            const currentUserData = {
+                id: currentUser.uid,
+                displayName: userProfile?.displayName || userProfile?.fullName || currentUser.displayName || currentUser.email?.split('@')[0],
+                email: currentUser.email,
+                avatar: userProfile?.photo || null
             };
 
             const channelData = {
-                name: `${currentUserDisplayData.display_name}, ${otherUserDisplayData.display_name}`,
+                name: `${currentUserData.displayName}, ${otherUserData.displayName || otherUserData.fullName}`,
                 description: 'Direct message conversation',
                 type: 'direct-message',
-                is_private: true,
-                is_dm: true,
-                members: membersArray, // Store sorted array
-                admins: membersArray, 
-                // moderators: [], // Assuming empty or not used for DMs
-                created_by: currentUserId,
-                created_at: currentTimestamp,
-                updated_at: currentTimestamp,
-                last_activity_at: currentTimestamp, // Use consistent naming, e.g. last_activity_at
-                member_count: 2,
-                participants_data: { // Store participant data in a JSONB field
-                    [currentUserId]: currentUserDisplayData,
-                    [otherUserId]: otherUserDisplayData
+                isPrivate: true,
+                isDM: true,
+                members: [currentUser.uid, otherUserId],
+                admins: [currentUser.uid, otherUserId], // Both users are admins of their DM
+                moderators: [],
+                createdBy: currentUser.uid,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                lastActivity: serverTimestamp(),
+                memberCount: 2,
+                // Store participant data for easy access
+                participants: {
+                    [currentUser.uid]: currentUserData,
+                    [otherUserId]: {
+                        id: otherUserId,
+                        displayName: otherUserData.displayName || otherUserData.fullName,
+                        email: otherUserData.email,
+                        avatar: otherUserData.photo || null
+                    }
                 }
             };
 
-            const { data: newChannel, error: insertError } = await supabase
-                .from('channels')
-                .insert(channelData)
-                .select()
-                .single();
-
-            if (insertError) throw insertError;
-            setLoading(false);
-            return newChannel;
+            // Use addDoc to let Firestore generate the ID
+            const newChannelRef = await addDoc(collection(db, 'channels'), channelData);
+            
+            // Return the created channel with the generated ID
+            return {
+                id: newChannelRef.id,
+                ...channelData
+            };
 
         } catch (err) {
             console.error('Error creating/finding DM channel:', err);
-            setError(err.message || 'Failed to create direct message channel');
-            setLoading(false);
+            setError('Failed to create direct message channel');
             throw err;
-        }
-    }, [currentUser, userProfile]);
-
-    const getDMChannels = useCallback(async () => {
-        const currentUserId = currentUser?.id;
-        if (!currentUserId) return [];
-        
-        setLoading(true);
-        setError(null);
-        try {
-            const { data, error: fetchError } = await supabase
-                .from('channels')
-                .select('*') // Select all fields, including participants_data
-                .eq('is_dm', true)
-                .contains('members', [currentUserId])
-                .order('last_activity_at', { ascending: false });
-
-            if (fetchError) throw fetchError;
-            
-            const channelsWithParticipantInfo = (data || []).map(ch => {
-                const otherUserIdInDM = ch.members.find(id => id !== currentUserId);
-                const otherParticipantInfo = ch.participants_data && otherUserIdInDM ? ch.participants_data[otherUserIdInDM] : null;
-                return { ...ch, otherParticipant: otherParticipantInfo }; // Add otherParticipant to the channel object
-            });
-
-            return channelsWithParticipantInfo;
-
-        } catch (err) {
-            console.error('Error fetching DM channels:', err);
-            setError(err.message || 'Failed to fetch DM channels');
-            return [];
         } finally {
             setLoading(false);
         }
-    }, [currentUser?.id]);
+    }, [currentUser, userProfile]);
 
+    // Get DM channels for current user
+    const getDMChannels = useCallback(async () => {
+        if (!currentUser?.uid) {
+            return [];
+        }
+
+        try {
+            // Query channels where current user is a member and it's a DM
+            const dmChannelsQuery = query(
+                collection(db, 'channels'),
+                where('members', 'array-contains', currentUser.uid),
+                where('isDM', '==', true)
+            );
+
+            const snapshot = await getDocs(dmChannelsQuery);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+        } catch (err) {
+            console.error('Error fetching DM channels:', err);
+            return [];
+        }
+    }, [currentUser?.uid]);
+
+    // Get the other participant in a DM channel
     const getOtherParticipant = useCallback((dmChannel) => {
-        const currentUserId = currentUser?.id;
-        // Ensure participants_data exists and currentUserId is valid
-        if (!dmChannel?.participants_data || !currentUserId || typeof dmChannel.participants_data !== 'object') {
+        if (!dmChannel?.participants || !currentUser?.uid) {
             return null;
         }
-        // Find the user ID in participants_data that is not the current user
-        const otherUserId = Object.keys(dmChannel.participants_data).find(
-            userId => userId !== currentUserId
-        );
-        return otherUserId ? dmChannel.participants_data[otherUserId] : null;
-    }, [currentUser?.id]);
 
+        const otherUserId = Object.keys(dmChannel.participants).find(
+            userId => userId !== currentUser.uid
+        );
+
+        return otherUserId ? dmChannel.participants[otherUserId] : null;
+    }, [currentUser?.uid]);
+
+    // Check if a channel is a DM channel
     const isDMChannel = useCallback((channel) => {
-        return channel?.is_dm === true || channel?.type === 'direct-message';
+        return channel?.isDM === true || channel?.type === 'direct-message';
     }, []);
 
     return {

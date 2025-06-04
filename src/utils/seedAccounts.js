@@ -1,67 +1,64 @@
-import { supabase } from './supabaseClient';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { logFirebaseRead, logFirebaseWrite } from './comprehensiveFirebaseTracker';
 
 const defaultAccounts = [
   {
     name: 'Bank Transfer',
     type: 'bank_transfer',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     name: 'Cash',
     type: 'cash',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     name: 'Credit Card',
     type: 'credit_card',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     name: 'PayPal',
     type: 'paypal',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   },
   {
     name: 'Stripe',
     type: 'payment_method',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   }
 ];
 
 export const seedAccounts = async () => {
   try {
     // Check if accounts already exist
-    const { data, error, count } = await supabase
-      .from('accounts')
-      .select('*', { count: 'exact', head: true });
+    const accountsRef = collection(db, 'accounts');
+    const snapshot = await getDocs(accountsRef);
     
-    if (error) {
-      console.error('Error checking accounts table:', error);
-      return;
-    }
+    // Log the Firebase read operation
+    logFirebaseRead('accounts', snapshot.size, 'Check if accounts collection needs seeding');
     
-    console.log(`Checking accounts table, found ${count} records`);
-    
-    if (count === 0) {
-      console.log('Seeding accounts table...');
+    if (snapshot.empty) {
+      console.log('Seeding accounts collection...');
       
-      const { error: insertError } = await supabase
-        .from('accounts')
-        .insert(defaultAccounts);
-      
-      if (insertError) {
-        console.error('Error seeding accounts:', insertError);
-        return;
+      for (const account of defaultAccounts) {
+        await addDoc(accountsRef, account);
+        
+        // Log the Firebase write operation
+        logFirebaseWrite('accounts', `Seeded account: ${account.name}`);
+        
+        console.log(`Added account: ${account.name}`);
       }
       
       console.log('Accounts seeded successfully!');
     } else {
-      console.log('Accounts table already has data, skipping seed.');
+      console.log('Accounts collection already has data, skipping seed.');
     }
   } catch (error) {
     console.error('Error seeding accounts:', error);

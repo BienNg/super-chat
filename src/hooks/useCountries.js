@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '../utils/supabaseClient';
+import { collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export function useCountries() {
   const [countries, setCountries] = useState([]);
@@ -8,15 +9,9 @@ export function useCountries() {
   const fetchCountries = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('countries')
-        .select('*');
-
-      if (error) {
-        throw error;
-      }
-
-      setCountries(data || []);
+      const snapshot = await getDocs(collection(db, 'countries'));
+      const countriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCountries(countriesData);
     } catch (error) {
       console.error('Error fetching countries:', error);
     } finally {
@@ -39,17 +34,10 @@ export function useCountries() {
         throw new Error(`Country "${trimmedCountry}" already exists`);
       }
       
-      const { data, error } = await supabase
-        .from('countries')
-        .insert([{ value: trimmedCountry }])
-        .select();
-      
-      if (error) {
-        throw error;
-      }
+      const docRef = await addDoc(collection(db, 'countries'), { value: trimmedCountry });
       
       // Add to local state immediately
-      const newCountry = data[0];
+      const newCountry = { id: docRef.id, value: trimmedCountry };
       setCountries(prev => [...prev, newCountry]);
       
       return newCountry;
@@ -61,15 +49,7 @@ export function useCountries() {
 
   const deleteCountry = async (id) => {
     try {
-      const { error } = await supabase
-        .from('countries')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        throw error;
-      }
-      
+      await deleteDoc(doc(db, 'countries', id));
       setCountries(prev => prev.filter(country => country.id !== id));
     } catch (error) {
       console.error('Error deleting country:', error);

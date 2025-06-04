@@ -1,8 +1,7 @@
 // src/components/Login.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { MessageSquare, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -10,85 +9,37 @@ const Login = () => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
-    
-    const { signInWithEmail, signUpWithEmail, signInWithGoogle, currentUser } = useAuth();
-    const navigate = useNavigate();
-    
-    // Redirect if user becomes authenticated
-    useEffect(() => {
-        if (currentUser) {
-            console.log("User authenticated, redirecting to home");
-            navigate('/');
-        }
-    }, [currentUser, navigate]);
+
+    const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        setError('');
-        setSuccessMessage('');
-        setLoading(true);
-        
         try {
+            setError('');
+            setLoading(true);
+            
             if (isSignUp) {
-                const { data, error: signUpError } = await signUpWithEmail(email, password);
-                
-                if (signUpError) {
-                    throw signUpError;
-                }
-                
-                console.log("Sign up response:", data);
-                
-                // Handle email confirmation flow
-                if (data.user && !data.session) {
-                    setSuccessMessage("Please check your email for a confirmation link to complete your signup.");
-                }
+                await signUpWithEmail(email, password);
             } else {
-                const { data, error: signInError } = await signInWithEmail(email, password);
-                
-                if (signInError) {
-                    throw signInError;
-                }
-                
-                console.log("Sign in successful:", data);
-                // The redirect will happen automatically in the useEffect
+                await signInWithEmail(email, password);
             }
         } catch (error) {
-            console.error("Auth error:", error);
-            
-            // Provide user-friendly error messages
-            if (error.message.includes("Email not confirmed")) {
-                setError("Please check your email to confirm your account before signing in.");
-            } else if (error.message.includes("Invalid login credentials")) {
-                setError("Invalid email or password. Please try again.");
-            } else {
-                setError(error.message);
-            }
-        } finally {
-            setLoading(false);
+            setError(error.message);
         }
+        
+        setLoading(false);
     };
 
     const handleGoogleSignIn = async () => {
-        setError('');
-        setSuccessMessage('');
-        setLoading(true);
-        
         try {
-            const { error: googleError } = await signInWithGoogle();
-            
-            if (googleError) {
-                throw googleError;
-            }
-            
-            // For Google signin, the redirect happens automatically
+            setError('');
+            setLoading(true);
+            await signInWithGoogle();
         } catch (error) {
-            console.error("Google auth error:", error);
-            setError("Google sign-in failed: " + error.message);
-        } finally {
-            setLoading(false);
+            setError(error.message);
         }
+        setLoading(false);
     };
 
     return (
@@ -105,12 +56,6 @@ const Login = () => {
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                         {error}
-                    </div>
-                )}
-                
-                {successMessage && (
-                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                        {successMessage}
                     </div>
                 )}
                 
@@ -160,11 +105,7 @@ const Login = () => {
                 
                 <div className="mt-6 text-center">
                     <button 
-                        onClick={() => {
-                            setIsSignUp(!isSignUp);
-                            setError('');
-                            setSuccessMessage('');
-                        }}
+                        onClick={() => setIsSignUp(!isSignUp)}
                         className="text-sm text-indigo-600 hover:text-indigo-500"
                     >
                         {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}

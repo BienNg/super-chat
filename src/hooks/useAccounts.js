@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient'; // Import Supabase client
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc 
+} from 'firebase/firestore';
+import { db } from '../firebase';
 
 export const useAccounts = () => {
   const [accounts, setAccounts] = useState([]);
@@ -7,62 +17,42 @@ export const useAccounts = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('accounts')
-          .select('*')
-          .order('name', { ascending: true });
+    const accountsRef = collection(db, 'accounts');
+    const q = query(accountsRef, orderBy('name', 'asc'));
 
-        if (error) throw error;
-        setAccounts(data || []);
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        const accountsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setAccounts(accountsData);
+        setLoading(false);
         setError(null);
-      } catch (err) {
+      },
+      (err) => {
         console.error('Error fetching accounts:', err);
         setError(err.message);
-        setAccounts([]);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    fetchAccounts();
-
-    // Set up a real-time listener for changes to the 'accounts' table
-    const subscription = supabase
-      .channel('public:accounts')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'accounts' },
-        (payload) => {
-          // console.log('Change received!', payload);
-          fetchAccounts(); // Refetch accounts on any change
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscription on component unmount
-    return () => {
-      supabase.removeChannel(subscription);
-    };
+    return () => unsubscribe();
   }, []);
 
   const addAccount = async (accountData) => {
     try {
-      const { data, error } = await supabase
-        .from('accounts')
-        .insert([
-          {
+      const docRef = await addDoc(collection(db, 'accounts'), {
         ...accountData,
-            created_at: new Date().toISOString(), // Supabase uses created_at by default
-            updated_at: new Date().toISOString(), // Supabase uses updated_at by default
-          },
-        ])
-        .select(); // Return the inserted row
-
-      if (error) throw error;
-      return data ? data[0] : null; // Return the new account with its ID
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Return the new account with its ID
+      return {
+        id: docRef.id,
+        ...accountData
+      };
     } catch (err) {
       console.error('Error adding account:', err);
       throw err;
@@ -71,15 +61,11 @@ export const useAccounts = () => {
 
   const updateAccount = async (accountId, updates) => {
     try {
-      const { error } = await supabase
-        .from('accounts')
-        .update({
+      const accountRef = doc(db, 'accounts', accountId);
+      await updateDoc(accountRef, {
         ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', accountId);
-
-      if (error) throw error;
+        updatedAt: new Date().toISOString()
+      });
     } catch (err) {
       console.error('Error updating account:', err);
       throw err;
@@ -88,12 +74,7 @@ export const useAccounts = () => {
 
   const deleteAccount = async (accountId) => {
     try {
-      const { error } = await supabase
-        .from('accounts')
-        .delete()
-        .eq('id', accountId);
-
-      if (error) throw error;
+      await deleteDoc(doc(db, 'accounts', accountId));
     } catch (err) {
       console.error('Error deleting account:', err);
       throw err;
@@ -106,6 +87,6 @@ export const useAccounts = () => {
     error,
     addAccount,
     updateAccount,
-    deleteAccount,
+    deleteAccount
   };
 }; 

@@ -1,5 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { 
+    collection, 
+    query, 
+    orderBy, 
+    onSnapshot,
+    where,
+    getDocs,
+    limit
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -15,7 +24,7 @@ export const useUsers = () => {
 
     // Fetch all users except current user
     const fetchUsers = useCallback(async () => {
-        if (!currentUser?.id) {
+        if (!currentUser?.uid) {
             setUsers([]);
             setLoading(false);
             return;
@@ -25,25 +34,29 @@ export const useUsers = () => {
             setLoading(true);
             setError(null);
             
-            // Query all users from profiles table
-            const { data, error: fetchError } = await supabase
-                .from('profiles')
-                .select('*')
-                .order('display_name', { ascending: true })
-                .limit(100);
+            // Query all users except current user
+            const usersQuery = query(
+                collection(db, 'users'),
+                orderBy('displayName', 'asc'),
+                limit(100) // Limit to prevent excessive reads
+            );
             
-            if (fetchError) throw fetchError;
+            const snapshot = await getDocs(usersQuery);
+            const usersData = snapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }))
+                .filter(user => user.id !== currentUser.uid); // Exclude current user
             
-            // Filter out current user
-            const filteredUsers = data.filter(user => user.id !== currentUser.id);
-            setUsers(filteredUsers);
+            setUsers(usersData);
         } catch (err) {
             console.error('Error fetching users:', err);
-            setError('Failed to fetch users: ' + err.message);
+            setError('Failed to fetch users');
         } finally {
             setLoading(false);
         }
-    }, [currentUser?.id]);
+    }, [currentUser?.uid]);
 
     // Load users on mount and when current user changes
     useEffect(() => {
@@ -61,8 +74,8 @@ export const useUsers = () => {
         
         const term = searchTerm.toLowerCase();
         return users.filter(user => 
-            user.display_name?.toLowerCase().includes(term) ||
-            user.full_name?.toLowerCase().includes(term) ||
+            user.displayName?.toLowerCase().includes(term) ||
+            user.fullName?.toLowerCase().includes(term) ||
             user.email?.toLowerCase().includes(term)
         );
     }, [users]);
